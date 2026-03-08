@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    スケジュール管理
+{% endblock %}
+
+{% block content %}
+    <header>
+        <h3>スケジュール管理</h3>
+    </header>
+    
+    <main>
+
+        <div class="calendar-section">
+            <h4>ToDo List</h4>
+            
+            {% if calendar_data %}
+                <div class="schedule-list">
+                    {% for plan_date, daily_plans in calendar_data.items() %}
+                        <div class="day-block">
+                            <h5 class="date-header">{{ plan_date }}の予定</h5>
+                            <ul>
+                                {% for plan in daily_plans %}
+                                    <li>
+                                        <strong>問題ID: {{ plan.problem_id }}</strong> 
+                                        ({{ plan.problem.source }})
+                                        
+                                        {% if plan.is_completed %}
+                                            <span style="color: green;">[完了]</span>
+                                        {% else %}
+                                            <span style="color: red;">[未完了]</span>
+                                        {% endif %}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p>現在、登録されている予定はありません。</p>
+            {% endif %}
+        </div>
+    </main>
+{% endblock content %}

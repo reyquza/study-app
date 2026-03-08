@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}
+    問題演習
+{% endblock title %}
+
+{% block content %}
+    <header>
+        <h3>問題演習</h3>
+        <p style="color: #666; font-size: 0.9em; margin-top: 5px;">
+            出典: {{ problem.source }}
+        </p>
+        <div style="margin-top: 5px;">
+            {% for tag in problem.tags %}
+                <span style="background-color: #e0e0e0; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; margin-right: 5px;">
+                    {{ tag.name }}
+                </span>
+            {% endfor %}
+        </div>
+    
+    </header>
+
+    <main>
+        {% include '_problem_display.html' %}
+
+        <div class="day-block" style="background-color: #e3f2fd; border-color: #bbdefb;">
+            <h4 style="margin-top: 0; color: #1976D2;">答案を提出する</h4>
+            <p style="font-size: 0.9em; color: #555;">解き終わったら、ノートの写真を撮ってアップロードしてください。</p>
+            
+            <form id="answer-form" action="/submit-answer/{{ problem.id }}" method="POST" enctype="multipart/form-data" onsubmit="showLoading()">
+                <div style="margin: 20px 0;">
+                    <input type="file" name="answer_image" accept="image/*" capture="environment" required style="width: 100%;">
+                </div>
+                
+                <div style="text-align: center;">
+                    <button id="submit-btn" type="submit" style="background-color: #1976D2; width: 100%;">
+                        AIに採点してもらう
+                    </button>
+                </div>
+            </form>
+        </div>
+
+
+        <div style="margin-top: 20px; text-align: center;">
+            <a href="/" style="color: #666; text-decoration: none;">← ホームに戻る</a>
+        </div>
+
+        <script>
+        function showLoading() {
+            const btn = document.getElementById('submit-btn');
+            
+            // 1. ボタンを無効化して二重送信（連打）を防ぐ
+            // ※フォーム送信処理自体はブロックしないよう、setTimeoutで少し遅らせて無効化するテクニック
+            setTimeout(() => {
+                btn.disabled = true;
+            }, 10);
+            
+            // 2. ボタンのデザインとテキストを「処理中」に変更
+            btn.style.backgroundColor = '#9e9e9e'; // グレーに変更
+            btn.innerHTML = '<span style="display: inline-block; animation: spin 1s linear infinite;"></span> AIが採点中... (数秒かかります)';
+        }
+
+        
+        </script>
+
+    </main>    
+{% endblock content %}

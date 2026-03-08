@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block title %}
+    問題登録
+{% endblock title %}
+
+{% block content %}
+    <header>
+        <h3>新しい問題を登録</h3>
+    </header>
+
+    <main>
+        <div class="day-block" style="background-color: #f8fcf8; border-color: #c8e6c9;">
+            <form action="/register-problem" method="post" enctype="multipart/form-data">
+                
+                <div style="margin-bottom: 20px;">
+                    <label style="font-weight: bold; color: #2e7d32; display: block; margin-bottom: 5px;">問題の画像 (必須)</label>
+                    <input type="file" name="image" accept="image/*" capture="environment" required style="width: 100%; padding: 10px; border: 1px dashed #4CAF50; background-color: #fff; border-radius: 4px;">
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="font-weight: bold; color: #555; display: block; margin-bottom: 5px;">問題文の手動入力 (任意)</label>
+                    <p style="font-size: 0.8em; color: #888; margin: 0 0 5px 0;">画像が読みづらい場合の補助テキストや、OCR結果を入力します。</p>
+                    <textarea name="text" rows="3" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;"></textarea>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="font-weight: bold; color: #555; display: block; margin-bottom: 5px;">出典 (任意)</label>
+                    <input type="text" name="source" placeholder="例: 青チャート P.120" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="font-weight: bold; color: #555; display: block; margin-bottom: 5px;">タグ (任意)</label>
+                    <input type="text" name="tags" placeholder="カンマ区切り（例: 数学, 微積分）" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                </div>
+
+                <div style="margin-bottom: 25px;">
+                    <label style="font-weight: bold; color: #555; display: block; margin-bottom: 5px;">解答予定日 (任意)</label>
+                    <input type="date" name="scheduled_date" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                </div>
+
+                <div style="text-align: center;">
+                    <button type="submit" style="background-color: #4CAF50; width: 100%; font-size: 1.1em; padding: 15px;">
+                        問題を登録する
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        <div style="margin-top: 20px; text-align: center;">
+            <a href="/" style="color: #666; text-decoration: none;">← ホームに戻る</a>
+        </div>
+    </main>
+
+{% endblock content %}

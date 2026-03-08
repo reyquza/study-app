@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    Study App
+{% endblock %}
+
+{% block content %}
+    <header>
+        <h3 style="text-align: center;">何やってるんですか　勉強してください！</h3>
+    </header>
+    
+    <main>
+        <div class="today-section">
+            <p>今日の日付： <strong>{{ today.strftime("%Y-%m-%d") }}</strong></p>
+        </div>
+
+        <div class="calendar-section">
+            <h4>未完了のToDo</h4>
+            <div>3日後までの未完了のToDoが表示されます</div>
+            {% if calendar_data %}
+                <div class="schedule-list">
+                    {% for plan_date, daily_plans in calendar_data.items() %}
+                        <div class="day-block">
+                            <h5 class="date-header">{{ plan_date }}のToDo</h5>
+                            <ul>
+                                {% for plan in daily_plans %}
+                                    <li>
+                                        <strong>問題ID: {{ plan.problem_id }}</strong> 
+                                        <a href="/solve/{{ plan.problem_id }}">
+                                            ({{ plan.problem.source }})
+                                        </a>
+                                        <span style="color: red;">[未完了]</span>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p>現在、未完了のTodoはありません。</p>
+            {% endif %}
+        </div>
+        <br>
+        <div>
+            <strong>Menu</strong>
+            <div style="margin-top: 20px;">
+                <a href="/schedule"><button>予定表を確認・編集する</button></a>
+            </div>
+            <div style="margin-top: 20px;">
+                <a href="/register-problem"><button>問題を登録する</button></a>
+            </div>
+        </div>
+    </main>
+{% endblock content %}
