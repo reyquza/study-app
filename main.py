@@ -19,11 +19,12 @@ FastAPI⇒「必要なものは全て関数の引数として受け取る(Depend
     SQLAlchemy: grade = db.query(Grade).filter(Grade.id == id).first() で探して、db.delete(grade) して db.commit()
 """
 
+import calendar
 import json
 import os
 import uuid
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -80,6 +81,13 @@ def get_db():
         yield db
     finally:
         db.close()
+        
+def get_prev_next_month(year, month):
+    previous_year = year - 1 if month == 1 else year
+    previous_month = 12 if month == 1 else month - 1
+    next_year = year + 1 if month == 12 else year
+    next_month = 1 if month == 12 else month + 1
+    return previous_year, previous_month, next_year, next_month
 
 """ バックエンド処理 """
 """ ホーム画面 ToDoとMenuとして進捗確認・問題登録・成績確認などを選択 """
@@ -106,10 +114,79 @@ def home(request: Request, db: Session = Depends(get_db)):
         }
     )
    
-
+   
+""" show all the log and schedule of the user. """
 @app.get('/schedule')
-def schedule():
-    pass
+def schedule(
+    request: Request,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    today = date.today()
+    if year is None or month is None:
+        year = today.year
+        month = today.month
+    
+    prev_y, prev_m, next_y, next_m = get_prev_next_month(year, month)
+    cal = calendar.monthcalendar(year, month)
+    
+    first_day = date(year, month, 1)
+    _, last_day_num = calendar.monthrange(year, month)
+    last_day = date(year, month, last_day_num)
+    
+    plans = (db.query(models.StudyPlan)
+            .filter(models.StudyPlan.scheduled_date >= first_day)
+            .filter(models.StudyPlan.scheduled_date <= last_day)
+            .all())
+    
+    plans_by_date = defaultdict(list)
+    for plan in plans:
+        plans_by_date[plan.scheduled_date.day].append(plan)
+    
+    return templates.TemplateResponse(
+        "schedule.html",
+        {
+            "request": request,
+            "year": year,
+            "month": month,
+            "cal": cal,
+            "plans_by_date": plans_by_date,
+            "prev_y": prev_y, "prev_m": prev_m,
+            "next_y": next_y, "next_m": next_m,
+            "today": today
+        }
+    )
+
+
+@app.get('/schedule/{target_date}')
+def daily_todo(
+    request: Request,
+    target_date: str,
+    db: Session = Depends(get_db)
+):
+    try:
+        date_object = datetime.strptime(target_date, "%Y-%m-%d").date()
+    except ValueError:
+        return RedirectResponse(url="/schedule", status_code=status.HTTP_303_SEE_OTHER)
+        
+    plans = db.query(models.StudyPlan).filter(
+        models.StudyPlan.scheduled_date == date_object
+    ).all()
+    
+    completed_plans = [p for p in plans if p.is_completed]
+    incomplete_plans = [p for p in plans if not p.is_completed]
+    
+    return templates.TemplateResponse(
+        "daily_todo.html",
+        {
+            "request": request,
+            "target_date": date_object,
+            "completed_plans": completed_plans,
+            "incomplete_plans": incomplete_plans
+        }
+    )
+    
 
 
 @app.get('/study')
@@ -152,7 +229,6 @@ def register_post(
     db.add(new_problem)
     db.flush() 
 
-    
     if tags:
         tag_list = tags.split(",")
         for tag_name in tag_list:
@@ -170,7 +246,6 @@ def register_post(
 
     if scheduled_date:
         try:
-            # "YYYY-MM-DD" の文字列を Python の date 型に変換
             parsed_date = datetime.strptime(scheduled_date, "%Y-%m-%d").date()
             
             new_plan = models.StudyPlan(
@@ -179,7 +254,7 @@ def register_post(
             )
             db.add(new_plan)
         except ValueError:
-            pass # 日付フォーマットがおかしい場合は無視するなどの処理
+            pass
 
     db.commit()
     
@@ -338,7 +413,6 @@ async def update_memo(
             status_code=status.HTTP_303_SEE_OTHER
         )
     
-
       
     
     
