@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block title %}{{ target_date.strftime("%Y-%m-%d") }} のToDo{% endblock title %}
+
+{% block content %}
+<header style="display: flex; justify-content: space-between; align-items: center;">
+    <h3>{{ target_date.strftime("%Y年%m月%d日") }} の予定</h3>
+    <a href="/schedule?year={{ target_date.year }}&month={{ target_date.month }}" style="color: #1976D2; text-decoration: none; font-size: 0.9em;">
+        カレンダーに戻る
+    </a>
+    <a href="/" style="color: #1976D2; text-decoration: none; font-size: 0.9em;">ホームに戻る</a>
+</header>
+
+<main>
+    <div class="day-block" style="background-color: #fff3e0; border-color: #ffe0b2; margin-bottom: 20px;">
+        <h4 style="margin-top: 0; color: #f57c00;">未完了のToDo</h4>
+        {% if incomplete_plans %}
+            <ul style="padding-left: 20px;">
+                {% for plan in incomplete_plans %}
+                    <li style="margin-bottom: 10px;">
+                        <a href="/solve/{{ plan.problem_id }}" style="text-decoration: none; color: #333;">
+                            <strong>問題ID: {{ plan.problem_id }}</strong> 
+                            ({{ plan.problem.source or "出典なし" }})
+                            <span style="display: inline-block; background-color: #e0e0e0; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-left: 10px;">
+                                解く
+                            </span>
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p style="color: #666; font-size: 0.9em;">未完了のToDoはありません。素晴らしいです!</p>
+        {% endif %}
+    </div>
+
+    <div class="day-block" style="background-color: #e8f5e9; border-color: #c8e6c9;">
+        <h4 style="margin-top: 0; color: #388e3c;">完了したToDo</h4>
+        {% if completed_plans %}
+            <ul style="padding-left: 20px;">
+                {% for plan in completed_plans %}
+                    <li style="margin-bottom: 10px;">
+                        <span style="color: #888; text-decoration: line-through;">
+                            <strong>問題ID: {{ plan.problem_id }}</strong> 
+                            ({{ plan.problem.source or "出典なし" }})
+                        </span>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p style="color: #666; font-size: 0.9em;">完了したToDoはまだありません。</p>
+        {% endif %}
+    </div>
+</main>
+{% endblock content %}
