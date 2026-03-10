@@ -25,7 +25,7 @@ import os
 import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta, date
-from typing import Optional
+from typing import Optional, List
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Depends, Form, status, UploadFile, File
@@ -82,12 +82,14 @@ def get_db():
     finally:
         db.close()
         
+        
 def get_prev_next_month(year, month):
     previous_year = year - 1 if month == 1 else year
     previous_month = 12 if month == 1 else month - 1
     next_year = year + 1 if month == 12 else year
     next_month = 1 if month == 12 else month + 1
     return previous_year, previous_month, next_year, next_month
+
 
 """ バックエンド処理 """
 """ ホーム画面 ToDoとMenuとして進捗確認・問題登録・成績確認などを選択 """
@@ -177,16 +179,109 @@ def daily_todo(
     completed_plans = [p for p in plans if p.is_completed]
     incomplete_plans = [p for p in plans if not p.is_completed]
     
+    latest_scores = {}
+    solve_counts = {}
+    
+    for plan in plans:
+        pid = plan.problem_id
+        
+        submissions = db.query(models.Submission).filter(
+            models.Submission.problem_id == pid
+        ).order_by(models.Submission.id.desc()).all()
+        
+        solve_counts[pid] = len(submissions)
+        
+        if submissions and submissions[0].score is not None:
+            latest_scores[pid] = f"{submissions[0].score}点"
+        else:
+            latest_scores[pid] = "-"
+            
+    
     return templates.TemplateResponse(
         "daily_todo.html",
         {
             "request": request,
             "target_date": date_object,
             "completed_plans": completed_plans,
-            "incomplete_plans": incomplete_plans
+            "incomplete_plans": incomplete_plans,
+            "latest_scores": latest_scores,
+            "solve_counts": solve_counts
         }
     )
     
+    
+@app.get('/confirm-problem/{problem_id}')
+def confirm_task(
+    request: Request,
+    problem_id: int = None,
+    db: Session = Depends(get_db)
+):
+    if problem_id is None:
+        return RedirectResponse(url="/", status_code=status.HTTP_400_BAD_REQUEST)
+    
+    problem = db.get(models.Problem, problem_id)
+    submissions = db.query(models.Submission).filter(
+        models.Submission.problem_id==problem_id).all()
+    
+    if problem:
+        return templates.TemplateResponse(
+            "confirm-problem.html",
+            {"request": request, "problem": problem, "submissions": submissions}
+        )
+        
+    else: return RedirectResponse(url="/", status_code=status.HTTP_400_BAD_REQUEST)
+
+
+@app.get('/add-task/{target_date}')
+def add_task(
+    request: Request,
+    target_date: date = None,
+    db: Session = Depends(get_db)
+):
+    problems = db.query(models.Problem).all()  
+    return templates.TemplateResponse(
+        "add_task.html",
+        {"request": request, "date": target_date, "problems": problems}
+    ) 
+    
+
+@app.post('/add-task/{target_date}')
+async def add_task_post(
+    request: Request, 
+    target_date: str, 
+    # チェックされた複数の problem_id をリストで受け取る
+    problem_ids: List[int] = Form(...), 
+    db: Session = Depends(get_db)
+):
+    try:
+        date_obj = datetime.strptime(target_date, "%Y-%m-%d").date()
+    except ValueError:
+        return RedirectResponse(url="/schedule", status_code=status.HTTP_303_SEE_OTHER)
+
+    # 選択された問題IDをループして、それぞれStudyPlanを作成する
+    for pid in problem_ids:
+        # 既に同じ日に同じ問題が登録されていないかチェック（重複防止）
+        existing_plan = db.query(models.StudyPlan).filter(
+            models.StudyPlan.problem_id == pid,
+            models.StudyPlan.scheduled_date == date_obj
+        ).first()
+        
+        # 登録されていなければ新規追加
+        if not existing_plan:
+            new_plan = models.StudyPlan(
+                problem_id=pid,
+                scheduled_date=date_obj,
+                is_completed=False
+            )
+            db.add(new_plan)
+            
+    db.commit()
+    
+    # 登録後は元の日付詳細ページに戻る
+    return RedirectResponse(
+        url=f"/schedule/{target_date}", 
+        status_code=status.HTTP_303_SEE_OTHER
+    )
 
 
 @app.get('/study')
