@@ -2,52 +2,106 @@
 {% block title %}{{ target_date.strftime("%Y-%m-%d") }} のToDo{% endblock title %}
 
 {% block content %}
-<header style="display: flex; justify-content: space-between; align-items: center;">
+<header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
     <h3>{{ target_date.strftime("%Y年%m月%d日") }} の予定</h3>
-    <a href="/schedule?year={{ target_date.year }}&month={{ target_date.month }}" style="color: #1976D2; text-decoration: none; font-size: 0.9em;">
-        カレンダーに戻る
-    </a>
-    <a href="/" style="color: #1976D2; text-decoration: none; font-size: 0.9em;">ホームに戻る</a>
+    <div>
+        <a href="/schedule?year={{ target_date.year }}&month={{ target_date.month }}" style="color: #1976D2; text-decoration: none; font-size: 0.9em; margin-right: 15px;">
+            カレンダーに戻る
+        </a>
+        <a href="/" style="color: #1976D2; text-decoration: none; font-size: 0.9em;">ホームに戻る</a>
+    </div>
 </header>
 
 <main>
-    <div class="day-block" style="background-color: #fff3e0; border-color: #ffe0b2; margin-bottom: 20px;">
-        <h4 style="margin-top: 0; color: #f57c00;">未完了のToDo</h4>
+    <div class="day-block" style="background-color: #fff8e1; border-color: #ffe0b2; margin-bottom: 30px;">
+        <h4 style="margin-top: 0; color: #f57c00; border-bottom: 2px solid #ffe0b2; padding-bottom: 5px;">未完了のToDo</h4>
+        
         {% if incomplete_plans %}
-            <ul style="padding-left: 20px;">
+            <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 15px;">
                 {% for plan in incomplete_plans %}
-                    <li style="margin-bottom: 10px;">
-                        <a href="/solve/{{ plan.problem_id }}" style="text-decoration: none; color: #333;">
-                            <strong>問題ID: {{ plan.problem_id }}</strong> 
-                            ({{ plan.problem.source or "出典なし" }})
-                            <span style="display: inline-block; background-color: #e0e0e0; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-left: 10px;">
-                                解く
-                            </span>
-                        </a>
-                    </li>
+                    <div style="background-color: white; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 15px;">
+                            <div style="flex: 1; min-width: 0;">
+                                <span style="font-size: 0.9em; color: #666;">問題ID: {{ plan.problem_id }}</span>
+                                <h5 style="margin: 5px 0 10px 0; color: #333; overflow-wrap: break-word; word-break: normal;">{{ plan.problem.source or "出典なし" }}</h5>
+                                
+                                <div style="margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 5px;">
+                                    {% for tag in plan.problem.tags %}
+                                        <span style="background-color: #f5f5f5; color: #555; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; border: 1px solid #ddd;">
+                                            {{ tag.name }}
+                                        </span>
+                                    {% endfor %}
+                                </div>
+                                
+                                <div style="font-size: 0.85em; color: #555;">
+                                    解いた回数: <strong>{{ solve_counts[plan.problem_id] }}回</strong> | 
+                                    前回の点数: <strong style="color: #d32f2f;">{{ latest_scores[plan.problem_id] }}</strong>
+                                </div>
+                            </div>
+                            <div style="text-align: right; flex-shrink: 0;">
+                                <a href="/solve/{{ plan.problem_id }}" style="display: inline-block; background-color: #f57c00; color: white; text-decoration: none; padding: 8px 15px; border-radius: 4px; font-size: 0.9em; font-weight: bold; margin-bottom: 10px;">
+                                    問題を解く
+                                </a>
+                                <br>
+                                <a href="/confirm-problem/{{ plan.problem_id }}" style="font-size: 0.8em; color: #1976D2; text-decoration: underline;">
+                                    タスクの詳細
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 {% endfor %}
-            </ul>
+            </div>
         {% else %}
-            <p style="color: #666; font-size: 0.9em;">未完了のToDoはありません。素晴らしいです!</p>
+            <p style="color: #666; font-size: 0.9em; margin-top: 15px;">未完了のToDoはありません。素晴らしいです!</p>
         {% endif %}
     </div>
 
     <div class="day-block" style="background-color: #e8f5e9; border-color: #c8e6c9;">
-        <h4 style="margin-top: 0; color: #388e3c;">完了したToDo</h4>
+        <h4 style="margin-top: 0; color: #388e3c; border-bottom: 2px solid #c8e6c9; padding-bottom: 5px;">完了したToDo</h4>
+        
         {% if completed_plans %}
-            <ul style="padding-left: 20px;">
+            <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 15px;">
                 {% for plan in completed_plans %}
-                    <li style="margin-bottom: 10px;">
-                        <span style="color: #888; text-decoration: line-through;">
-                            <strong>問題ID: {{ plan.problem_id }}</strong> 
-                            ({{ plan.problem.source or "出典なし" }})
-                        </span>
-                    </li>
+                    <div style="background-color: white; border: 1px solid #c8e6c9; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 15px;">
+                            <div style="flex: 1; min-width: 0;">
+                                <span style="font-size: 0.9em; color: #888; text-decoration: line-through;">問題ID: {{ plan.problem_id }}</span>
+                                <h5 style="margin: 5px 0 10px 0; color: #666; overflow-wrap: break-word; word-break: normal;">{{ plan.problem.source or "出典なし" }}</h5>
+                                
+                                <div style="margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 5px;">
+                                    {% for tag in plan.problem.tags %}
+                                        <span style="background-color: #f1f8e9; color: #555; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; border: 1px solid #c8e6c9;">
+                                            {{ tag.name }}
+                                        </span>
+                                    {% endfor %}
+                                </div>
+                                
+                                <div style="font-size: 0.85em; color: #555;">
+                                    解いた回数: <strong>{{ solve_counts[plan.problem_id] }}回</strong> | 
+                                    今回の点数: <strong style="color: #388e3c;">{{ latest_scores[plan.problem_id] }}</strong>
+                                </div>
+                            </div>
+                            <div style="text-align: right; flex-shrink: 0;">
+                                <a href="/solve/{{ plan.problem_id }}" style="display: inline-block; background-color: #4CAF50; color: white; text-decoration: none; padding: 8px 15px; border-radius: 4px; font-size: 0.9em; font-weight: bold; margin-bottom: 10px;">
+                                    もう一度解く
+                                </a>
+                                <br>
+                                <a href="/confirm-problem/{{ plan.problem_id }}" style="font-size: 0.8em; color: #1976D2; text-decoration: underline;">
+                                    タスクの詳細
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 {% endfor %}
-            </ul>
+            </div>
         {% else %}
-            <p style="color: #666; font-size: 0.9em;">完了したToDoはまだありません。</p>
+            <p style="color: #666; font-size: 0.9em; margin-top: 15px;">完了したToDoはまだありません。</p>
         {% endif %}
+    </div>
+    <div style="margin-top: 30px; text-align: center; padding-bottom: 20px;">
+        <a href="/add-task/{{ target_date.strftime('%Y-%m-%d') }}" style="display: inline-block; background-color: #4CAF50; color: white; text-decoration: none; padding: 15px 40px; border-radius: 30px; font-size: 1.1em; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.15); transition: background-color 0.3s;">
+            ＋ 新しいタスクを追加する
+        </a>
     </div>
 </main>
 {% endblock content %}

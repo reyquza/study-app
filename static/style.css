@@ -1,4 +1,18 @@
 /* static/style.css */
+/* --- ここから追加：全要素の箱のサイズ計算を統一する（はみ出し防止の鉄則） --- */
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+/* style.css の上部（inputの設定の付近）に追加 */
+input, textarea, select {
+    max-width: 100%;
+    font-size: 16px; /* iOSの自動ズーム防止 */
+}
+
+a, button {
+    -webkit-tap-highlight-color: transparent; /* タップ時のグレー背景を消す */
+}
 
 /* 全体の基本設定 */
 body {
@@ -7,6 +21,18 @@ body {
     color: #333;
     margin: 0;
     padding: 0;
+    
+    display: flex;
+    flex-direction: column;
+    
+    /* 変更箇所: vh を dvh (Dynamic Viewport Height) に変更 */
+    min-height: 100dvh; 
+    
+    /* 追加: 万が一はみ出た要素があっても、横揺れ（横スクロール）を強制的にブロックする */
+    overflow-x: hidden; 
+    /* --- ここから追加：縦の揺れ（バウンド効果）を防止 --- */
+    overscroll-behavior-y: none; 
+    /* --- ここまで追加 --- */
 }
 
 /* ナビゲーションバー */
@@ -22,6 +48,7 @@ nav h2 {
     font-size: 24px;
 }
 
+
 /* メインコンテンツの囲い */
 .container {
     max-width: 800px;
@@ -30,7 +57,29 @@ nav h2 {
     background-color: white;
     border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    /* --- ここから追加 --- */
+    flex: 1; /* コンテンツエリアを縦に伸ばして、フッターを下に押しやる */
+    width: 90%; /* スマホ閲覧時に左右の余白を少し持たせる */
+    box-sizing: border-box;
+    /* --- ここまで追加 --- */
+    /* --- ここから追加：下部の余白確保 --- */
+    /* iPhoneのホームバー（画面下の黒い線）を避けつつ、さらに余裕を持たせる設定 */
+    padding-bottom: calc(60px + env(safe-area-inset-bottom));
+    /* --- ここまで追加 --- */
 }
+
+/* フッター */
+footer {
+    background-color: #5aa75d;
+    color: white;
+    padding: 15px; /* 少し広げました */
+    /* --- ここから追加：フッターの下にも安全領域を確保 --- */
+    padding-bottom: calc(100px + env(safe-area-inset-bottom));
+    /* --- ここまで追加 --- */
+    text-align: center; /* コピーライトを中央揃えに */
+    font-size: 0.9em;
+}
+
 
 /* ヘッダーと今日のセクション */
 header {
@@ -38,6 +87,20 @@ header {
     border-bottom: 2px solid #eee;
     padding-bottom: 10px;
 }
+
+/*ボタンのデザイン */
+button {
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    font-size: 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+} 
+
+
 
 .today-section {
     background-color: #e8f5e9;
@@ -63,7 +126,7 @@ header {
 
 /* 日付ごとのブロック（カード風） */
 .day-block {
-    background-color: #fff;
+    background-color: #ffffff;
     border: 1px solid #ddd;
     border-radius: 6px;
     padding: 15px;
@@ -95,21 +158,7 @@ header {
     padding-bottom: 0;
 }
 
-/* ボタンのデザイン */
-button {
-    background-color: #2196F3;
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    font-size: 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-}
 
-button:hover {
-    background-color: #0b7dda;
-}
 
 .problem-box {
     background-color: #f9f9f9;
@@ -226,4 +275,27 @@ button:hover {
 @keyframes spin{
     0%{transform:rotate(0deg);}
     100%{transform:rotate(360deg);}
+}
+
+
+/* ライトグリーンの角丸ボタン */
+.rounded-btn {
+    display: block;
+    width: 100%;
+    max-width: 280px; /* 全てのボタンがこの幅で統一されます */
+    background-color: #81c784; /* ライトグリーン */
+    color: white;
+    text-align: center;
+    padding: 15px 20px;
+    border-radius: 30px; /* 丸みを帯びたカプセル型 */
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 1em;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: background-color 0.3s ease;
+    box-sizing: border-box;
+}
+
+.rounded-btn:hover {
+    background-color: #66bb6a; /* 押した時（ホバー時）に少し濃くする */
 }

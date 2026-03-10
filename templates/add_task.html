@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block title %}タスク追加{% endblock title %}
+
+{% block content %}
+<header style="margin-bottom: 20px;">
+    <h3>{{ date }} にタスクを追加</h3>
+</header>
+
+<main>
+    <div class="day-block" style="background-color: #f1f8e9; border-color: #c8e6c9;">
+        <p style="color: #388e3c; font-weight: bold; margin-top: 0;">追加する問題を選択してください（複数選択可）</p>
+        
+        <input type="text" id="search-input" placeholder=" タグや出典で検索..." style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 20px; box-sizing: border-box; font-size: 1em;">
+
+        <form action="/add-task/{{ date }}" method="post">
+            <div id="problem-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                {% for problem in problems %}
+                    <label class="problem-card" style="display: block; background-color: white; border: 2px solid #e0e0e0; border-radius: 8px; padding: 15px; cursor: pointer; position: relative; transition: all 0.2s;">
+                        
+                        <div style="position: absolute; top: 15px; right: 15px;">
+                            <input type="checkbox" name="problem_ids" value="{{ problem.id }}" style="transform: scale(1.5);">
+                        </div>
+                        
+                        <div style="margin-bottom: 10px; padding-right: 30px;">
+                            <span style="font-size: 0.8em; color: #666;">ID: {{ problem.id }}</span><br>
+                            <strong class="problem-source" style="color: #333;">{{ problem.source or "出典なし" }}</strong>
+                        </div>
+                        
+                        <div class="problem-tags" style="margin-bottom: 10px;">
+                            {% for tag in problem.tags %}
+                                <span style="background-color: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 12px; font-size: 0.75em; border: 1px solid #c8e6c9; display: inline-block; margin-bottom: 4px;">{{ tag.name }}</span>
+                            {% endfor %}
+                        </div>
+                        
+                        <div style="height: 100px; overflow: hidden; border-top: 1px solid #eee; padding-top: 10px; position: relative;">
+                            {% if problem.problem_image_path %}
+                                <img src="/{{ problem.problem_image_path }}" alt="問題画像" style="width: 100%; height: 100%; object-fit: contain; object-position: top left;">
+                            {% elif problem.problem_text %}
+                                <p style="font-size: 0.85em; color: #555; margin: 0; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;">{{ problem.problem_text }}</p>
+                            {% else %}
+                                <p style="font-size: 0.8em; color: #aaa; margin: 0;">画像・テキストなし</p>
+                            {% endif %}
+                            <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 30px; background: linear-gradient(transparent, white);"></div>
+                        </div>
+                    </label>
+                {% endfor %}
+            </div>
+            
+            <div style="text-align: center; position: sticky; bottom: 20px; z-index: 10;">
+                <button type="submit" style="background-color: #4CAF50; color: white; border: none; padding: 15px 30px; border-radius: 30px; font-size: 1.1em; font-weight: bold; width: 100%; max-width: 400px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); cursor: pointer;">
+                    選択したタスクを追加する
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <div style="margin-top: 20px; text-align: center; padding-bottom: 40px;">
+        <a href="/schedule/{{ date }}" style="color: #666; text-decoration: none;">← キャンセルして戻る</a>
+    </div>
+</main>
+
+<script>
+    // リアルタイム検索機能
+    const searchInput = document.getElementById('search-input');
+    const problemCards = document.querySelectorAll('.problem-card');
+
+    searchInput.addEventListener('input', function() {
+        const keyword = this.value.toLowerCase();
+        
+        problemCards.forEach(card => {
+            const source = card.querySelector('.problem-source').textContent.toLowerCase();
+            const tags = card.querySelector('.problem-tags').textContent.toLowerCase();
+            
+            // 出典かタグにキーワードが含まれていれば表示、それ以外は非表示
+            if (source.includes(keyword) || tags.includes(keyword)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    });
+
+    // チェックボックスに連動してカードの枠色を変える（選んでいることが分かりやすくなるUX）
+    problemCards.forEach(card => {
+        const checkbox = card.querySelector('input[type="checkbox"]');
+        
+        // カード全体をクリックしたときにも発火させる
+        checkbox.addEventListener('change', function() {
+            if (this.checked) {
+                card.style.borderColor = '#4CAF50';
+                card.style.backgroundColor = '#f1f8e9';
+                card.style.borderWidth = '2px';
+            } else {
+                card.style.borderColor = '#e0e0e0';
+                card.style.backgroundColor = 'white';
+            }
+        });
+    });
+</script>
+{% endblock content %}

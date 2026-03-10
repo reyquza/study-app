@@ -1,12 +1,13 @@
 {% extends 'base.html' %}
 
 {% block title %}
-    Study App
+    Home
 {% endblock %}
 
 {% block content %}
     <header>
         <h3 style="text-align: center;">何やってるんですか　勉強してください！</h3>
+        <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
     </header>
     
     <main>
@@ -25,11 +26,11 @@
                             <ul>
                                 {% for plan in daily_plans %}
                                     <li>
-                                        <strong>問題ID: {{ plan.problem_id }}</strong> 
-                                        <a href="/solve/{{ plan.problem_id }}">
-                                            ({{ plan.problem.source }})
-                                        </a>
-                                        <span style="color: red;">[未完了]</span>
+                                    <span style="font-size: 0.9em; color: #666;">問題ID: {{ plan.problem_id }}</span>
+                                    <a href="/solve/{{ plan.problem_id }}" style="color: inherit; text-decoration: none; font-weight: bold; display: block; margin: 5px 0;">
+                                        {{ plan.problem.source }}
+                                    </a>
+                                    <span style="color: #d32f2f; font-size: 0.9em;">[未完了]</span>
                                     </li>
                                 {% endfor %}
                             </ul>
@@ -41,14 +42,9 @@
             {% endif %}
         </div>
         <br>
-        <div>
-            <strong>Menu</strong>
-            <div style="margin-top: 20px;">
-                <a href="/schedule"><button>予定表を確認・編集する</button></a>
-            </div>
-            <div style="margin-top: 20px;">
-                <a href="/register-problem"><button>問題を登録する</button></a>
-            </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 15px; margin-top: 30px; margin-bottom: 20px;">
+            <a href="/schedule" class="rounded-btn">予定表を確認・編集する</a>
+            <a href="/register-problem" class="rounded-btn">問題を登録する</a>
         </div>
     </main>
 {% endblock content %}
