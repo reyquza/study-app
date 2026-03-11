@@ -1,27 +1,7 @@
-"""
-Flask⇒  「グローバルに用意された便利な箱(request や session、g)」をどこからでも引っ張り出して使うスタイル
-FastAPI⇒「必要なものは全て関数の引数として受け取る(Depends(大元の関数を実行する前にDepends内の関数を実行する)を使う)」スタイル
-    1. リクエストデータは変数として受け取る  username: str = Form(...)
-    2. GET, POSTなどはメソッドごとに分ける  @app.get("/login")
-    3. デコレータではなくDepends           current_user: User = Depends(get_current_user) もしログインしていなければ、get_current_user の中でエラーを弾く。
-"""
-"""
-データの取得 (SELECT)
-    SQLite: cursor.execute("SELECT * FROM users WHERE username = ?", (name,)) して fetchone()
-    SQLAlchemy: db.query(User).filter(User.username == name).first()
-
-データの追加 (INSERT)
-    SQLite: cursor.execute("INSERT INTO users (username) VALUES (?)", (name,)) して db.commit()
-    SQLAlchemy: new_user = User(username=name) でインスタンスを作り、db.add(new_user) して db.commit()
-
-データの削除 (DELETE)
-    SQLite: cursor.execute("DELETE FROM grades WHERE id = ?", (id,))
-    SQLAlchemy: grade = db.query(Grade).filter(Grade.id == id).first() で探して、db.delete(grade) して db.commit()
-"""
-
 import calendar
 import json
 import os
+import secrets
 import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta, date
@@ -31,7 +11,8 @@ import cloudinary
 import cloudinary.uploader
 import requests
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, Depends, Form, status, UploadFile, File
+from fastapi import FastAPI, Request, Depends, Form, status, UploadFile, File, HTTPException
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.responses import StreamingResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -48,11 +29,36 @@ import models
 """ 環境変数 """
 load_dotenv()
 DATABASE_URL = os.getenv('DATABASE_URL')
+
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    
 SECRETKEY = os.getenv('SECRETKEY')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
+
+""" Basic Security """
+security = HTTPBasic()
+
+def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
+    correct_username = secrets.compare_digest(
+        credentials.username, os.getenv("ADMIN_USERNAME", "admin")
+    )
+    correct_password = secrets.compare_digest(
+        credentials.password, os.getenv("ADMIN_PASSWORD", "secret_pass")
+    )
+    
+    if not (correct_username and correct_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
+
+
 """ 初期設定 """
-app = FastAPI()
+app = FastAPI(dependencies=[Depends(get_current_username)])
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.add_middleware(SessionMiddleware, secret_key=SECRETKEY)
