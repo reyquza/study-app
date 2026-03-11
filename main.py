@@ -27,6 +27,9 @@ from collections import defaultdict
 from datetime import datetime, timedelta, date
 from typing import Optional, List
 
+import cloudinary
+import cloudinary.uploader
+import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Depends, Form, status, UploadFile, File
 from fastapi.responses import StreamingResponse, RedirectResponse
@@ -58,6 +61,12 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+cloudinary.config(
+  cloud_name = os.getenv("CLOUDINARY_NAME"),
+  api_key = os.getenv("CLOUDINARY_KEY"),
+  api_secret = os.getenv("CLOUDINARY_SECRET")
+)
 
 """ 動作確認用 """
 models.Base.metadata.create_all(bind=engine)
@@ -306,12 +315,14 @@ def register_post(
 ):
     problem_image_path = None
     if image:
-        os.makedirs("static/images/problems", exist_ok=True)
-        _, ext = os.path.splitext(image.filename)
-        unique_filename = f"{uuid.uuid4()}{ext}"
-        problem_image_path = f"static/images/problems/{unique_filename}"
-        with open(problem_image_path, "wb") as f:
-            f.write(image.file.read()) 
+        # os.makedirs("static/images/problems", exist_ok=True)
+        # _, ext = os.path.splitext(image.filename)
+        # unique_filename = f"{uuid.uuid4()}{ext}"
+        # problem_image_path = f"static/images/problems/{unique_filename}"
+        # with open(problem_image_path, "wb") as f:
+        #     f.write(image.file.read())
+        result = cloudinary.uploader.upload(image.file)
+        problem_image_path = result.get("secure_url")
             
     if source:
         source = source.strip()
@@ -384,18 +395,20 @@ async def submit_answer(
     
     """ Send to LLM """
     # Get the extension and generate a random file name that will never overlap
-    os.makedirs("static/images/answers", exist_ok=True)
-    _, ext = os.path.splitext(answer_image.filename)
-    unique_filename = f"{uuid.uuid4()}{ext}"
-    save_path = f"static/images/answers/{unique_filename}"
+    # os.makedirs("static/images/answers", exist_ok=True)
+    # _, ext = os.path.splitext(answer_image.filename)
+    # unique_filename = f"{uuid.uuid4()}{ext}"
+    # save_path = f"static/images/answers/{unique_filename}"
     
-    # contents which will send to the LLM
-    contents = []
+    # answer_bytes = await answer_image.read()
+    # with open(save_path, "wb") as f:
+    #     f.write(answer_bytes)
     
     answer_bytes = await answer_image.read()
-    with open(save_path, "wb") as f:
-        f.write(answer_bytes)
+    result = cloudinary.uploader.upload(answer_bytes)
+    save_path = result.get("secure_url")
     
+    contents = []
     problem = db.query(models.Problem).filter(models.Problem.id==problem_id).one()
         
     prompt = """
@@ -414,9 +427,11 @@ async def submit_answer(
         
     if problem.problem_image_path:
         path = problem.problem_image_path
-        with open(path, 'rb') as f:
-            image_bytes = f.read()
-            
+        # with open(path, 'rb') as f:
+        #     image_bytes = f.read()
+        response = requests.get(path)
+        image_bytes = response.content
+        
         image_content = types.Part.from_bytes(
             data=image_bytes, mime_type="image/jpeg"
         )
