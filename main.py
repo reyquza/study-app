@@ -72,8 +72,8 @@ cloudinary.config(
 DAILY_LIMIT = 5
 
 
-""" 動作確認用 """
-models.Base.metadata.create_all(bind=engine)
+# """ 動作確認用 """
+# models.Base.metadata.create_all(bind=engine)
 
 """ define the format """
 class Reply(BaseModel):
@@ -148,6 +148,13 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
 
 
 """ バックエンド処理 """
+@app.get("/reset-db-secret")
+def reset_db_secret():
+    # 警告：データベースのテーブルを全て削除し、まっさらな状態で作り直します
+    models.Base.metadata.drop_all(bind=engine)
+    models.Base.metadata.create_all(bind=engine)
+    return {"message": "データベースを完全にリセットし、最新の設計図で作り直しました！ホーム画面に戻ってください。"}
+
 
 """ login page """
 @app.get("/login")
