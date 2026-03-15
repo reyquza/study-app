@@ -1,8 +1,5 @@
 import calendar
-import json
 import os
-import secrets
-import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta, date
 from typing import Optional, List
@@ -10,10 +7,11 @@ from typing import Optional, List
 import cloudinary
 import cloudinary.uploader
 import requests
+import firebase_admin
+from firebase_admin import credentials, auth
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, Depends, Form, status, UploadFile, File, HTTPException
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from fastapi.responses import StreamingResponse, RedirectResponse
+from fastapi import FastAPI, Request, Depends, Form, status, UploadFile, File, Response
+from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from google import genai
@@ -24,6 +22,8 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker, Session
 
 import models
+
+
 
 
 """ 環境変数 """
@@ -37,42 +37,32 @@ SECRETKEY = os.getenv('SECRETKEY')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 
-""" Basic Security """
-security = HTTPBasic()
-
-def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
-    correct_username = secrets.compare_digest(
-        credentials.username, os.getenv("ADMIN_USERNAME", "admin")
-    )
-    correct_password = secrets.compare_digest(
-        credentials.password, os.getenv("ADMIN_PASSWORD", "secret_pass")
-    )
-    
-    if not (correct_username and correct_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    return credentials.username
-
-
 """ 初期設定 """
-app = FastAPI(dependencies=[Depends(get_current_username)])
+app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.add_middleware(SessionMiddleware, secret_key=SECRETKEY)
+
+@app.middleware("http")
+async def add_user_state(request: Request, call_next):
+    request.state.user = None
+    response = await call_next(request)
+    return response
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+cred = credentials.Certificate("firebase-credentials.json")
+firebase_admin.initialize_app(cred)
+
 cloudinary.config(
   cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME"),
-  api_key = os.getenv("CCLOUDINARY_API_KEY"),
+  api_key = os.getenv("CLOUDINARY_API_KEY"),
   api_secret = os.getenv("CLOUDINARY_API_SECRET")
 )
+
 
 """ 動作確認用 """
 models.Base.metadata.create_all(bind=engine)
@@ -87,6 +77,7 @@ class Reply(BaseModel):
     explanation: str = Field(
         description="問題の模範解答と、本番での解法戦略(部分点の狙い方など)の解説。数式を書く際は必ずLaTeX形式とし、インライン数式は $ で、ブロック数式は $$ で囲んでください。",
     )
+    
     
 """ Dependency Functions """
 
@@ -106,15 +97,71 @@ def get_prev_next_month(year, month):
     return previous_year, previous_month, next_year, next_month
 
 
+# 未ログイン時に発生させる専用のエラー
+class NotAuthenticatedException(Exception):
+    pass
+
+@app.exception_handler(NotAuthenticatedException)
+def auth_exception_handler(request: Request, exc: NotAuthenticatedException):
+    return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+
+# Cookieのトークンを確認する係
+def get_current_user(request: Request, db: Session = Depends(get_db)):
+    token = request.cookies.get("token")
+    if not token:
+        raise NotAuthenticatedException()
+    
+    try:
+        decoded_token = auth.verify_id_token(token)
+        uid = decoded_token.get('uid')
+        email = decoded_token.get('email')
+        user = db.get(models.User, uid)
+        
+        if not user:
+            user = models.User(id=uid, email=email)
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        
+        request.state.user = user
+        
+        return user
+    except Exception as e:
+        print(f"認証エラー詳細: {e}") # 確認用
+        raise NotAuthenticatedException()
+
+
 """ バックエンド処理 """
+
+""" login page """
+@app.get("/login")
+def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+""" logout system """
+@app.get("/logout")
+def logout(response: Response):
+    # Firebase側のセッションはフロントエンドでsignOutする。
+    # ここではバックエンドのセッションクッキーだけ確実に削除し、
+    # フロント側に「ログアウト直後」であることをクエリパラメータで伝える。
+    response.delete_cookie("token")
+    return RedirectResponse(url="/login?logged_out=1", status_code=status.HTTP_303_SEE_OTHER)
+
+
 """ ホーム画面 ToDoとMenuとして進捗確認・問題登録・成績確認などを選択 """
 @app.get('/')
-def home(request: Request, db: Session = Depends(get_db)):
-    today = datetime.today()
+def home(request: Request,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
+    today = datetime.today().date()
     
     plans = db.scalars(
         select(models.StudyPlan)
-        .where(models.StudyPlan.scheduled_date <= today+timedelta(3))
+        .join(models.Problem)
+        .where(models.Problem.user_id == user.id)
+        .where(models.StudyPlan.scheduled_date <= today+timedelta(days=3))
         .order_by(models.StudyPlan.scheduled_date)
     ).all()
     
@@ -127,7 +174,7 @@ def home(request: Request, db: Session = Depends(get_db)):
         {
             "request": request, 
             "today": today,
-            "calendar_data": dict(calendar_data)      
+            "calendar_data": dict(calendar_data),    
         }
     )
    
@@ -138,7 +185,8 @@ def schedule(
     request: Request,
     year: Optional[int] = None,
     month: Optional[int] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user)
 ):
     today = date.today()
     if year is None or month is None:
@@ -153,6 +201,7 @@ def schedule(
     last_day = date(year, month, last_day_num)
     
     plans = (db.query(models.StudyPlan)
+             .join(models.Problem)
             .filter(models.StudyPlan.scheduled_date >= first_day)
             .filter(models.StudyPlan.scheduled_date <= last_day)
             .all())
@@ -180,14 +229,16 @@ def schedule(
 def daily_todo(
     request: Request,
     target_date: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user)
 ):
     try:
         date_object = datetime.strptime(target_date, "%Y-%m-%d").date()
     except ValueError:
         return RedirectResponse(url="/schedule", status_code=status.HTTP_303_SEE_OTHER)
         
-    plans = db.query(models.StudyPlan).filter(
+    plans = db.query(models.StudyPlan).join(models.Problem).filter(
+        models.Problem.user_id == user.id,
         models.StudyPlan.scheduled_date == date_object
     ).all()
     
@@ -229,31 +280,37 @@ def daily_todo(
 def confirm_task(
     request: Request,
     problem_id: int = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user)
 ):
     if problem_id is None:
         return RedirectResponse(url="/", status_code=status.HTTP_400_BAD_REQUEST)
     
-    problem = db.get(models.Problem, problem_id)
+    problem = db.query(models.Problem).filter(
+        models.Problem.id == problem_id, 
+        models.Problem.user_id == user.id
+    ).first()
+    
+    if not problem:
+        return RedirectResponse(url="/", status_code=status.HTTP_400_BAD_REQUEST)
+    
     submissions = db.query(models.Submission).filter(
         models.Submission.problem_id==problem_id).all()
     
-    if problem:
-        return templates.TemplateResponse(
-            "confirm-problem.html",
-            {"request": request, "problem": problem, "submissions": submissions}
-        )
-        
-    else: return RedirectResponse(url="/", status_code=status.HTTP_400_BAD_REQUEST)
+    return templates.TemplateResponse(
+        "confirm-problem.html",
+        {"request": request, "problem": problem, "submissions": submissions}
+    )
 
 
 @app.get('/add-task/{target_date}')
 def add_task(
     request: Request,
     target_date: date = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user)
 ):
-    problems = db.query(models.Problem).all()  
+    problems = db.query(models.Problem).filter(models.Problem.user_id == user.id).all()
     return templates.TemplateResponse(
         "add_task.html",
         {"request": request, "date": target_date, "problems": problems}
@@ -264,24 +321,28 @@ def add_task(
 async def add_task_post(
     request: Request, 
     target_date: str, 
-    # チェックされた複数の problem_id をリストで受け取る
     problem_ids: List[int] = Form(...), 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user)
 ):
     try:
         date_obj = datetime.strptime(target_date, "%Y-%m-%d").date()
     except ValueError:
         return RedirectResponse(url="/schedule", status_code=status.HTTP_303_SEE_OTHER)
 
-    # 選択された問題IDをループして、それぞれStudyPlanを作成する
     for pid in problem_ids:
-        # 既に同じ日に同じ問題が登録されていないかチェック（重複防止）
+        user_prob = db.query(models.Problem).filter(
+            models.Problem.id == pid,
+            models.Problem.user_id == user.id).first()
+        
+        if not user_prob:
+            continue
+       
         existing_plan = db.query(models.StudyPlan).filter(
             models.StudyPlan.problem_id == pid,
             models.StudyPlan.scheduled_date == date_obj
         ).first()
         
-        # 登録されていなければ新規追加
         if not existing_plan:
             new_plan = models.StudyPlan(
                 problem_id=pid,
@@ -291,8 +352,7 @@ async def add_task_post(
             db.add(new_plan)
             
     db.commit()
-    
-    # 登録後は元の日付詳細ページに戻る
+
     return RedirectResponse(
         url=f"/schedule/{target_date}", 
         status_code=status.HTTP_303_SEE_OTHER
@@ -305,7 +365,7 @@ def study(request: Request, db: Session = Depends(get_db)):
 
 
 @app.get("/register-problem")
-def register_problem(request: Request):
+def register_problem(request: Request, user: models.User = Depends(get_current_user)):
     return templates.TemplateResponse("register_problem.html", {"request": request})
 
 
@@ -318,15 +378,10 @@ def register_post(
     source: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),
     scheduled_date: Optional[str] = Form(None),
+    user: models.User = Depends(get_current_user)
 ):
     problem_image_path = None
     if image:
-        # os.makedirs("static/images/problems", exist_ok=True)
-        # _, ext = os.path.splitext(image.filename)
-        # unique_filename = f"{uuid.uuid4()}{ext}"
-        # problem_image_path = f"static/images/problems/{unique_filename}"
-        # with open(problem_image_path, "wb") as f:
-        #     f.write(image.file.read())
         result = cloudinary.uploader.upload(image.file)
         problem_image_path = result.get("secure_url")
             
@@ -334,6 +389,7 @@ def register_post(
         source = source.strip()
 
     new_problem = models.Problem(
+        user_id=user.id,
         problem_image_path=problem_image_path,
         problem_text=text,
         source=source,
@@ -373,14 +429,18 @@ def register_post(
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
         
 
-
 @app.get('/solve/{problem_id}')
 def solve(
     request: Request,
     problem_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user)
     ):
-    problem = db.query(models.Problem).filter(models.Problem.id == problem_id).first()
+    problem = db.query(models.Problem).filter(
+        models.Problem.id == problem_id,
+        models.Problem.user_id == user.id
+    ).first()
+    
     if problem:
         return templates.TemplateResponse(
             "solve.html",
@@ -396,27 +456,25 @@ async def submit_answer(
     request: Request,
     problem_id: int,
     db: Session = Depends(get_db),
-    answer_image: UploadFile = File(...)
-    ):
+    answer_image: UploadFile = File(...),
+    user: models.User = Depends(get_current_user)
+):
     
     """ Send to LLM """
-    # Get the extension and generate a random file name that will never overlap
-    # os.makedirs("static/images/answers", exist_ok=True)
-    # _, ext = os.path.splitext(answer_image.filename)
-    # unique_filename = f"{uuid.uuid4()}{ext}"
-    # save_path = f"static/images/answers/{unique_filename}"
     
-    # answer_bytes = await answer_image.read()
-    # with open(save_path, "wb") as f:
-    #     f.write(answer_bytes)
-    
+    problem = db.query(models.Problem).filter(
+        models.Problem.id==problem_id,
+        models.Problem.user_id == user.id
+    ).one()
+    if not problem:
+        return RedirectResponse(url="/", status_code=status.HTTP_404_NOT_FOUND)
+       
     answer_bytes = await answer_image.read()
     result = cloudinary.uploader.upload(answer_bytes)
     save_path = result.get("secure_url")
     
     contents = []
-    problem = db.query(models.Problem).filter(models.Problem.id==problem_id).one()
-        
+     
     prompt = """
     あなたは九州大学文系数学の入試指導に熟練したプロの予備校講師です。
     生徒から問題と、その解答の画像が送られてきました。
@@ -488,16 +546,22 @@ async def submit_answer(
 def answer(
     request: Request,
     submission_id: int,
-    db: Session = Depends(get_db)
-    ):
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user)
+):
     
-    submission = db.get(models.Submission, submission_id)
-    studyplan = db.query(models.StudyPlan).filter(models.StudyPlan.problem_id == submission.problem_id).one()
-    studyplan.is_completed = True
-    db.commit()
-    
+    submission = db.query(models.Submission).join(models.Problem).filter(
+        models.Submission.id == submission_id,
+        models.Problem.user_id == user.id
+    ).first()
     if not submission:
         return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+    
+    studyplan = db.query(models.StudyPlan).filter(models.StudyPlan.problem_id == submission.problem_id).one()
+    if studyplan:
+        studyplan.is_completed = True
+        db.commit()
+    
     
     return templates.TemplateResponse(
         'answer.html',
@@ -516,9 +580,14 @@ async def update_memo(
     submission_id: int,
     db: Session = Depends(get_db),
     mistake: str=Form(...),
-    user_memo: str=Form(...)
-    ):
-    submission = db.get(models.Submission, submission_id)
+    user_memo: str=Form(...),
+    user: models.User = Depends(get_current_user)
+):
+    submission = db.query(models.Submission).join(models.Problem).filter(
+        models.Submission.id == submission_id,
+        models.Problem.user_id == user.id
+    ).first()
+    
     if submission:
         submission.mistake = mistake
         submission.user_memo = user_memo

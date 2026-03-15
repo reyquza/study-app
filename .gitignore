@@ -12,3 +12,4 @@ teacher/
 .env
 *.db
 static/images/
+firebase-credentials.json
