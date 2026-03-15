@@ -4,6 +4,11 @@
 {% endblock %}
 
 {% block content %}
+    {% if error_message %}
+        <div style="background-color: #ffebee; color: #c62828; padding: 15px; margin-bottom: 20px; border-radius: 5px; border: 1px solid #ef9a9a; text-align: center; font-weight: bold;">
+            {{ error_message }}
+        </div>
+    {% endif %}
     <header>
         <h3 style="text-align: center;">何やってるんですか　勉強してください！</h3>
         <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
