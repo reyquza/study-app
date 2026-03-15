@@ -14,6 +14,8 @@ anyio==4.12.1
     #   watchfiles
 bcrypt==5.0.0
     # via webapp-study
+cachecontrol==0.14.4
+    # via firebase-admin
 certifi==2026.2.25
     # via
     #   cloudinary
@@ -34,27 +36,75 @@ colorama==0.4.6 ; sys_platform == 'win32'
     #   qrcode
     #   uvicorn
 cryptography==46.0.5
-    # via google-auth
+    # via
+    #   google-auth
+    #   pyjwt
 distro==1.9.0
     # via google-genai
 fastapi==0.135.1
     # via webapp-study
+firebase-admin==7.2.0
+    # via webapp-study
+google-api-core==2.30.0
+    # via
+    #   firebase-admin
+    #   google-cloud-core
+    #   google-cloud-firestore
+    #   google-cloud-storage
 google-auth==2.48.0
-    # via google-genai
+    # via
+    #   google-api-core
+    #   google-cloud-core
+    #   google-cloud-firestore
+    #   google-cloud-storage
+    #   google-genai
+google-cloud-core==2.5.0
+    # via
+    #   google-cloud-firestore
+    #   google-cloud-storage
+google-cloud-firestore==2.24.0 ; platform_python_implementation != 'PyPy'
+    # via firebase-admin
+google-cloud-storage==3.9.0
+    # via firebase-admin
+google-crc32c==1.8.0
+    # via
+    #   google-cloud-storage
+    #   google-resumable-media
 google-genai==1.66.0
     # via webapp-study
+google-resumable-media==2.8.0
+    # via google-cloud-storage
+googleapis-common-protos==1.73.0
+    # via
+    #   google-api-core
+    #   grpcio-status
 greenlet==3.3.2 ; platform_machine == 'AMD64' or platform_machine == 'WIN32' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'ppc64le' or platform_machine == 'win32' or platform_machine == 'x86_64'
     # via sqlalchemy
+grpcio==1.78.0
+    # via
+    #   google-api-core
+    #   google-cloud-firestore
+    #   grpcio-status
+grpcio-status==1.78.0
+    # via google-api-core
 h11==0.16.0
     # via
     #   httpcore
     #   uvicorn
+h2==4.3.0
+    # via httpx
+hpack==4.1.0
+    # via h2
 httpcore==1.0.9
     # via httpx
 httptools==0.7.1
     # via uvicorn
 httpx==0.28.1
-    # via google-genai
+    # via
+    #   firebase-admin
+    #   google-genai
+hyperframe==6.1.0
+    # via h2
 idna==3.11
     # via
     #   anyio
@@ -70,8 +120,21 @@ markupsafe==3.0.3
     # via
     #   jinja2
     #   mako
+msgpack==1.1.2
+    # via cachecontrol
 pillow==12.1.1
     # via qrcode
+proto-plus==1.27.1
+    # via
+    #   google-api-core
+    #   google-cloud-firestore
+protobuf==6.33.5
+    # via
+    #   google-api-core
+    #   google-cloud-firestore
+    #   googleapis-common-protos
+    #   grpcio-status
+    #   proto-plus
 psycopg2-binary==2.9.11
     # via webapp-study
 pyasn1==0.6.2
@@ -89,6 +152,8 @@ pydantic==2.12.5
     #   webapp-study
 pydantic-core==2.41.5
     # via pydantic
+pyjwt==2.11.0
+    # via firebase-admin
 python-dotenv==1.2.2
     # via
     #   uvicorn
@@ -101,7 +166,10 @@ qrcode==8.2
     # via webapp-study
 requests==2.32.5
     # via
+    #   cachecontrol
+    #   google-api-core
     #   google-auth
+    #   google-cloud-storage
     #   google-genai
     #   webapp-study
 rsa==4.9.1
@@ -124,6 +192,7 @@ typing-extensions==4.15.0
     #   anyio
     #   fastapi
     #   google-genai
+    #   grpcio
     #   pydantic
     #   pydantic-core
     #   sqlalchemy

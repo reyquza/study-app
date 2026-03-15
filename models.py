@@ -8,6 +8,17 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 class Base(DeclarativeBase): # classがデータベースのテーブルであることを示す親クラス
     pass
 
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    email: Mapped[Optional[str]] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    
+    problems: Mapped[List["Problem"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    
+    
 # 中間テーブル    
 problem_tag = Table(
     "problem_tag",
@@ -37,6 +48,10 @@ class Problem(Base):
     __tablename__ = 'problems'
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    
+    """ User System """
+    user_id: Mapped[Optional[str]] = mapped_column(ForeignKey('users.id'))
+    user: Mapped["User"] = relationship(back_populates="problems")
     
     # 問題データ
     """  format must be like 'static/images/problems/uuid' """
