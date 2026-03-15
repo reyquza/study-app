@@ -1,7 +1,7 @@
 import calendar
 import os
 from collections import defaultdict
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, time
 from typing import Optional, List
 
 import cloudinary
@@ -36,6 +36,12 @@ if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
 SECRETKEY = os.getenv('SECRETKEY')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
+WHITELISTS = [
+    email.strip().lower()
+    for email in os.getenv("WHITELISTS", "").split(",")
+    if email
+]
+
 
 """ 初期設定 """
 app = FastAPI()
@@ -62,6 +68,8 @@ cloudinary.config(
   api_key = os.getenv("CLOUDINARY_API_KEY"),
   api_secret = os.getenv("CLOUDINARY_API_SECRET")
 )
+
+DAILY_LIMIT = 5
 
 
 """ 動作確認用 """
@@ -116,8 +124,15 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
         decoded_token = auth.verify_id_token(token)
         uid = decoded_token.get('uid')
         email = decoded_token.get('email')
-        user = db.get(models.User, uid)
+        email_verified = decoded_token.get('email_verified')
         
+        
+        # リストにないメールアドレスの場合はエラーにして弾く
+        if email.lower() not in WHITELISTS or not email_verified:
+            print(f"不正なログイン試行をブロックしました: {email}")
+            raise NotAuthenticatedException()
+        
+        user = db.get(models.User, uid)
         if not user:
             user = models.User(id=uid, email=email)
             db.add(user)
@@ -151,7 +166,9 @@ def logout(response: Response):
 
 """ ホーム画面 ToDoとMenuとして進捗確認・問題登録・成績確認などを選択 """
 @app.get('/')
-def home(request: Request,
+def home(
+    request: Request,
+    error: Optional[str] = None,
     db: Session = Depends(get_db),
     user: dict = Depends(get_current_user)
 ):
@@ -174,7 +191,9 @@ def home(request: Request,
         {
             "request": request, 
             "today": today,
-            "calendar_data": dict(calendar_data),    
+            "calendar_data": dict(calendar_data),
+            "user": user,
+            "error_message": "本日のAI採点の上限に達しました。また明日ご利用ください!" if error == "limit_reached" else None
         }
     )
    
@@ -459,6 +478,21 @@ async def submit_answer(
     answer_image: UploadFile = File(...),
     user: models.User = Depends(get_current_user)
 ):
+    """ Add constraints of use of AI """
+
+    today_start = datetime.combine(datetime.today(), time.min)
+    tomorrow_start = today_start + timedelta(days=1)
+    
+    usage_count = db.query(models.Submission).join(models.Problem).filter(
+        models.Problem.user_id == user.id,
+        models.Submission.solved_at >= today_start,
+        models.Submission.solved_at < tomorrow_start
+    ).count()
+    
+    if usage_count >= DAILY_LIMIT:
+        print(f"制限到達: {user.email} が1日の上限({DAILY_LIMIT}回)に達しました。")
+        # 制限に引っかかったら、ホーム画面にエラー付きで追い返す
+        return RedirectResponse(url="/?error=limit_reached", status_code=status.HTTP_303_SEE_OTHER)
     
     """ Send to LLM """
     
