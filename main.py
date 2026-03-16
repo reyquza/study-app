@@ -231,7 +231,8 @@ def schedule(
     last_day = date(year, month, last_day_num)
     
     plans = (db.query(models.StudyPlan)
-             .join(models.Problem)
+            .join(models.Problem)
+            .filter(models.Problem.user_id == user.id)
             .filter(models.StudyPlan.scheduled_date >= first_day)
             .filter(models.StudyPlan.scheduled_date <= last_day)
             .all())
