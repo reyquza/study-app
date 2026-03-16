@@ -105,12 +105,12 @@ def get_prev_next_month(year, month):
     return previous_year, previous_month, next_year, next_month
 
 
-# 未ログイン時に発生させる専用のエラー
 class NotAuthenticatedException(Exception):
     pass
 
 @app.exception_handler(NotAuthenticatedException)
 def auth_exception_handler(request: Request, exc: NotAuthenticatedException):
+    # 入場券がない（未ログイン）場合は、強制的にログイン画面に飛ばす
     return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -147,14 +147,18 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
         raise NotAuthenticatedException()
 
 
-""" バックエンド処理 """
-@app.get("/reset-db-secret")
-def reset_db_secret():
-    # 警告：データベースのテーブルを全て削除し、まっさらな状態で作り直します
-    models.Base.metadata.drop_all(bind=engine)
-    models.Base.metadata.create_all(bind=engine)
-    return {"message": "データベースを完全にリセットし、最新の設計図で作り直しました！ホーム画面に戻ってください。"}
+""" 開発用(危険!!!)"""
+# データベース強制削除
+# @app.get("/reset-db-secret")
+# def reset_db_secret():
+#     # 警告：データベースのテーブルを全て削除し、まっさらな状態で作り直します
+#     models.Base.metadata.drop_all(bind=engine)
+#     models.Base.metadata.create_all(bind=engine)
+#     return {"message": "データベースを完全にリセットし、最新の設計図で作り直しました！ホーム画面に戻ってください。"}
 
+
+
+""" バックエンド処理 """
 
 """ login page """
 @app.get("/login")
