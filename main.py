@@ -3,6 +3,7 @@ import os
 from collections import defaultdict
 from datetime import datetime, timedelta, date, time
 from typing import Optional, List
+from urllib.parse import urlparse
 
 import cloudinary
 import cloudinary.uploader
@@ -10,7 +11,8 @@ import requests
 import firebase_admin
 from firebase_admin import credentials, auth
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, Depends, Form, status, UploadFile, File, Response
+from fastapi import FastAPI, Request, Depends, Form, status, UploadFile, File, Response, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -42,17 +44,39 @@ WHITELISTS = [
     if email
 ]
 
+ALLOWED_CONTENT_TYPES = {"image/png", "image/jpeg", "image/pdf"}
+MAX_FILE_SIZE = 10 * 1024 * 1024
 
 """ 初期設定 """
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
-app.add_middleware(SessionMiddleware, secret_key=SECRETKEY)
+
+origins = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "https://NextLearn.onrender.com"
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,       
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["*"], 
+)
+
+app.add_middleware(SessionMiddleware, secret_key=SECRETKEY, https_only=True)
 
 @app.middleware("http")
-async def add_user_state(request: Request, call_next):
+async def combined_middleware(request: Request, call_next):
     request.state.user = None
+
     response = await call_next(request)
+    
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    
     return response
 
 client = genai.Client(api_key=GEMINI_API_KEY)
@@ -70,6 +94,7 @@ cloudinary.config(
 )
 
 DAILY_LIMIT = 5
+fetch_limit = 30
 
 
 # """ 動作確認用 """
@@ -85,6 +110,9 @@ class Reply(BaseModel):
     explanation: str = Field(
         description="問題の模範解答と、本番での解法戦略(部分点の狙い方など)の解説。数式を書く際は必ずLaTeX形式とし、インライン数式は $ で、ブロック数式は $$ で囲んでください。",
     )
+    
+class TokenRequest(BaseModel):
+    token: str
     
     
 """ Dependency Functions """
@@ -147,6 +175,38 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
         raise NotAuthenticatedException()
 
 
+async def validate_upload_image(upload: UploadFile):
+    if upload.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="許可されていないファイル形式です。JPEG/PNG/PDFのみアップロード可能です。",
+        )
+        
+    data = await upload.read()
+    if len(data) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="ファイルサイズが大きすぎます(上限10MB)。",
+        )
+    return data
+    
+
+def ensure_url(url: str):
+    if not url:
+         raise HTTPException(status_code=400, detail="URL is missing")
+         
+    parsed = urlparse(url)
+    
+    if parsed.scheme not in ("http", "https"):
+        raise HTTPException(status_code=400, detail="Invalid url scheme")
+        
+    is_valid_domain = parsed.netloc == "cloudinary.com" or parsed.netloc.endswith(".cloudinary.com")
+    
+    if not is_valid_domain:
+        print(f"ブロックされた不正なホスト: {parsed.netloc}")
+        raise HTTPException(status_code=400, detail="Not allowed host")
+     
+
 """ 開発用(危険!!!)"""
 # データベース強制削除
 # @app.get("/reset-db-secret")
@@ -164,6 +224,28 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
 @app.get("/login")
 def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
+
+""" set cookie """
+@app.post("/set-cookie")
+def set_cookie(request: TokenRequest, response: Response):
+    # verify the token sended from the frontend
+    try:
+        decoded_token = auth.verify_id_token(request.token)
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Invalid Token")
+    
+    response.set_cookie(
+        key="token",
+        value=request.token,
+        httponly=True,             # prohibit access from JS to prevent XSS attack
+        secure=True,               # only transmit when the scheme is https
+        samesite="lax",            # prevent CSRF
+        max_age=3600, 
+        path="/"          
+    )
+    
+    return {"status": "success"}
+
 
 """ logout system """
 @app.get("/logout")
@@ -341,7 +423,10 @@ def add_task(
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user)
 ):
-    problems = db.query(models.Problem).filter(models.Problem.user_id == user.id).all()
+    problems = (db.query(models.Problem)
+                .filter(models.Problem.user_id == user.id)
+                .order_by(models.Problem.id.desc()).limit(fetch_limit).all())
+    
     return templates.TemplateResponse(
         "add_task.html",
         {"request": request, "date": target_date, "problems": problems}
@@ -512,10 +597,11 @@ async def submit_answer(
         models.Problem.id==problem_id,
         models.Problem.user_id == user.id
     ).one()
+    
     if not problem:
         return RedirectResponse(url="/", status_code=status.HTTP_404_NOT_FOUND)
        
-    answer_bytes = await answer_image.read()
+    answer_bytes = await validate_upload_image(answer_image)
     result = cloudinary.uploader.upload(answer_bytes)
     save_path = result.get("secure_url")
     
@@ -535,21 +621,29 @@ async def submit_answer(
     if problem.problem_text:
         contents.append(f"【問題文】\n{problem.problem_text}")
         
+        
     if problem.problem_image_path:
         path = problem.problem_image_path
-        # with open(path, 'rb') as f:
-        #     image_bytes = f.read()
-        response = requests.get(path)
-        image_bytes = response.content
         
-        image_content = types.Part.from_bytes(
-            data=image_bytes, mime_type="image/jpeg"
-        )
-        contents.append(image_content)
-    
+        ensure_url(path)
+        
+        try:
+            response = requests.get(path, timeout=10)
+            response.raise_for_status()
+            image_bytes = response.content
+            
+            image_content = types.Part.from_bytes(
+                data=image_bytes, mime_type="image/jpeg"
+            )
+            contents.append(image_content)
+
+        except requests.exceptions.RequestException as e:
+            print(f"画像取得エラー: {e}")
+            raise HTTPException(status_code=400, detail="画像の取得に失敗しました。")
+        
     else: 
         return RedirectResponse(
-        url="/solve/{problem_id}",
+        url=f"/solve/{problem_id}",
         status_code=status.HTTP_404_NOT_FOUND
         )
     
