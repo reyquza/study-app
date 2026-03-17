@@ -61,14 +61,35 @@
             }
         });
 
+
+        // login.html の修正部分
         onAuthStateChanged(auth, async (user) => {
             if (!user) {
                 return;
             }
 
             const token = await user.getIdToken();
-            document.cookie = `token=${token}; path=/`;
-            window.location.href = "/"; // ログイン成功でホームへ
+            
+            try {
+                const response = await fetch("/set-cookie", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ token: token }) // JSON形式でトークンを送る
+                });
+
+                // バックエンドが問題なくCookieをセットしてくれたら、ホーム画面へ移動
+                if (response.ok) {
+                    window.location.href = "/"; 
+                } else {
+                    alert("ログイン処理に失敗しました。");
+                    await signOut(auth); // 念のためサインアウトさせておく
+                }
+            } catch (error) {
+                console.error("通信エラー:", error);
+                alert("サーバーとの通信に失敗しました。");
+            }
         });
     </script>
 </body>
