@@ -249,12 +249,14 @@ def set_cookie(request: TokenRequest, response: Response):
 
 """ logout system """
 @app.get("/logout")
-def logout(response: Response):
-    # Firebase側のセッションはフロントエンドでsignOutする。
-    # ここではバックエンドのセッションクッキーだけ確実に削除し、
-    # フロント側に「ログアウト直後」であることをクエリパラメータで伝える。
-    response.delete_cookie("token")
-    return RedirectResponse(url="/login?logged_out=1", status_code=status.HTTP_303_SEE_OTHER)
+def logout():
+    # logged_out=1 を付けてログイン画面にリダイレクト
+    response = RedirectResponse(url="/login?logged_out=1", status_code=status.HTTP_303_SEE_OTHER)
+    
+    # 【超重要】ここでバックエンドのCookie（リストバンド）を確実に破棄する！
+    response.delete_cookie(key="token", path="/", httponly=True, secure=True, samesite="lax")
+    
+    return response
 
 
 """ ホーム画面 ToDoとMenuとして進捗確認・問題登録・成績確認などを選択 """
@@ -454,18 +456,18 @@ async def add_task_post(
         if not user_prob:
             continue
        
-        existing_plan = db.query(models.StudyPlan).filter(
-            models.StudyPlan.problem_id == pid,
-            models.StudyPlan.scheduled_date == date_obj
-        ).first()
+        # existing_plan = db.query(models.StudyPlan).filter(
+        #     models.StudyPlan.problem_id == pid,
+        #     models.StudyPlan.scheduled_date == date_obj
+        # ).first()
         
-        if not existing_plan:
-            new_plan = models.StudyPlan(
-                problem_id=pid,
-                scheduled_date=date_obj,
-                is_completed=False
-            )
-            db.add(new_plan)
+        # if not existing_plan:
+        new_plan = models.StudyPlan(
+            problem_id=pid,
+            scheduled_date=date_obj,
+            is_completed=False
+        )
+        db.add(new_plan)
             
     db.commit()
 

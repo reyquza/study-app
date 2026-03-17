@@ -64,6 +64,11 @@
 
         // login.html の修正部分
         onAuthStateChanged(auth, async (user) => {
+            // 【追加】ログアウト処理中なら、ここで処理をストップして自動ログインを防ぐ！
+            if (isLoggedOut) {
+                return;
+            }
+
             if (!user) {
                 return;
             }
