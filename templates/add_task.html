@@ -34,7 +34,7 @@
                         
                         <div style="height: 100px; overflow: hidden; border-top: 1px solid #eee; padding-top: 10px; position: relative;">
                             {% if problem.problem_image_path %}
-                                <img src="/{{ problem.problem_image_path }}" alt="問題画像" style="width: 100%; height: 100%; object-fit: contain; object-position: top left;">
+                                <img src="{{ problem.problem_image_path }}" alt="問題画像" style="width: 100%; height: 100%; object-fit: contain; object-position: top left;">
                             {% elif problem.problem_text %}
                                 <p style="font-size: 0.85em; color: #555; margin: 0; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;">{{ problem.problem_text }}</p>
                             {% else %}

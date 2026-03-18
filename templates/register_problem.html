@@ -6,16 +6,47 @@
 {% block content %}
     <header>
         <h3 style="text-align: center;">新しい問題を登録</h3>
+        <style>
+            .spinner {
+                display:inline-block;
+                width:16px;
+                height:16px;
+                border:2px solid #ccc;
+                border-top:2px solid #1976D2;
+                border-radius:50%;
+                animation: spin 1s linear infinite;
+                margin-right:5px;
+            }
+
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        </style>
     </header>
 
     <main>
         <div class="day-block" style="background-color: #f8fcf8; border-color: #c8e6c9;">
             <form action="/register-problem" method="post" enctype="multipart/form-data">
                 
-                <div style="margin-bottom: 20px;">
+                <!-- <div style="margin-bottom: 20px;">
                     <label style="font-weight: bold; color: #2e7d32; display: block; margin-bottom: 5px;">問題の画像 (必須)</label>
                     <input type="file" name="image" accept="image/*" required style="width: 100%; padding: 10px; border: 1px dashed #4CAF50; background-color: #fff; border-radius: 4px;">
+                </div> -->
+                <div style="margin-bottom: 20px;">
+                    <label style="font-weight: bold; color: #2e7d32; display: block; margin-bottom: 5px;">問題のファイル (画像 または PDF)</label>
+                    <input type="file" id="fileInput" name="image" accept="image/*,application/pdf" required style="width: 100%; padding: 10px; border: 1px dashed #4CAF50; background-color: #fff; border-radius: 4px;">
                 </div>
+
+                <div id="previewContainer" style="margin-bottom: 20px; display: none; text-align: center;">
+                    <p style="font-size: 0.8em; color: #888; margin-bottom: 5px;">アップロードするファイルのプレビュー</p>
+                    <p id="loadingText" style="display:none; color:#1976D2;">
+                        <span class="spinner"></span> 変換中...
+                    </p>
+                    <img id="imagePreview" style="max-width: 100%; max-height: 300px; border-radius: 4px; display: none; margin: 0 auto; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                    <iframe id="pdfPreview" style="width: 100%; height: 400px; border: 1px solid #ccc; display: none;"></iframe>
+                </div>
+
 
                 <div style="margin-bottom: 20px;">
                     <label style="font-weight: bold; color: #555; display: block; margin-bottom: 5px;">問題文の手動入力 (任意)</label>
@@ -51,4 +82,56 @@
         </div>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+    <script>
+        document.getElementById('fileInput').addEventListener('change', async function(event) {
+            const file = event.target.files[0];
+            const previewContainer = document.getElementById('previewContainer');
+            const imagePreview = document.getElementById('imagePreview');
+            const pdfPreview = document.getElementById('pdfPreview');
+
+            if (!file) {
+                previewContainer.style.display = 'none';
+                return;
+            }
+
+            previewContainer.style.display = 'block';
+
+            if (file.type === 'image/heic' || file.name.toLowerCase().endsWith('.heic')) {
+
+                loadingText.style.display = 'block';
+                imagePreview.style.display = 'none';
+                pdfPreview.style.display = 'none';
+
+                try {
+                    const convertedBlob = await heic2any({
+                        blob: file,
+                        toType: "image/jpeg",
+                        quality: 0.5
+                    });
+                    loadingText.style.display = 'none';
+
+                    imagePreview.src = URL.createObjectURL(convertedBlob);
+                    imagePreview.style.display = 'block';
+
+                } catch (e) {
+                    loadingText.style.display = 'none';
+                    console.error(e);
+                    alert("プレビューの表示に失敗しました。");
+                }
+            }
+            
+            else if (file.type.startsWith('image/')) {
+                imagePreview.src = URL.createObjectURL(file);
+                imagePreview.style.display = 'block';
+                pdfPreview.style.display = 'none';
+            } else if (file.type === 'application/pdf') {
+                pdfPreview.src = URL.createObjectURL(file);
+                pdfPreview.style.display = 'block';
+                imagePreview.style.display = 'none';
+            }
+        });
+    </script>
 {% endblock content %}
+
+    

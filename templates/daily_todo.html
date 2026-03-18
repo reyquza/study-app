@@ -38,11 +38,20 @@
                                     前回の点数: <strong style="color: #d32f2f;">{{ latest_scores[plan.problem_id] }}</strong>
                                 </div>
                             </div>
-                            <div style="text-align: right; flex-shrink: 0;">
-                                <a href="/solve/{{ plan.problem_id }}" style="display: inline-block; background-color: #f57c00; color: white; text-decoration: none; padding: 8px 15px; border-radius: 4px; font-size: 0.9em; font-weight: bold; margin-bottom: 10px;">
+                            <div style="display: flex; flex-direction: column; gap: 10px; max-width: 300px;">
+                                <a href="/solve/{{ plan.problem_id }}"
+                                style="display: block; width: 100%; text-align: center;
+                                        background-color: #f57c00; color: white; text-decoration: none;
+                                        padding: 10px; border-radius: 6px; font-weight: bold;">
                                     問題を解く
                                 </a>
-                                <br>
+                                <form action="/delete-task/{{ plan.id }}" method="post" onsubmit="return confirm('本当にこのタスクを削除しますか？');">
+                                    <button type="submit" style="display: block; width: 100%; text-align: center;
+                                        background-color: #f1e60d; color: white; text-decoration: none;
+                                        padding: 10px; border-radius: 6px; font-weight: bold;">
+                                        タスクを削除
+                                    </button>
+                                </form>
                                 <a href="/confirm-problem/{{ plan.problem_id }}" style="font-size: 0.8em; color: #1976D2; text-decoration: underline;">
                                     タスクの詳細
                                 </a>
