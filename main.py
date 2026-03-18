@@ -26,7 +26,8 @@ from sqlalchemy.orm import sessionmaker, Session
 import models
 
 
-
+""" ローカルか本番か """
+IS_PRODUCTION = os.getenv("RENDER") is not None
 
 """ 環境変数 """
 load_dotenv()
@@ -44,7 +45,14 @@ WHITELISTS = [
     if email
 ]
 
-ALLOWED_CONTENT_TYPES = {"image/png", "image/jpeg", "image/pdf"}
+ALLOWED_CONTENT_TYPES = {"image/png",
+                         "image/jpeg",
+                         "application/pdf",
+                         "image/webp", 
+                         "image/heic", 
+                         "image/heif"
+                         }
+
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
 """ 初期設定 """
@@ -65,7 +73,7 @@ app.add_middleware(
     allow_headers=["*"], 
 )
 
-app.add_middleware(SessionMiddleware, secret_key=SECRETKEY, https_only=True)
+app.add_middleware(SessionMiddleware, secret_key=SECRETKEY, https_only=IS_PRODUCTION)
 
 @app.middleware("http")
 async def combined_middleware(request: Request, call_next):
@@ -176,10 +184,14 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
 
 
 async def validate_upload_image(upload: UploadFile):
-    if upload.content_type not in ALLOWED_CONTENT_TYPES:
+    # ファイルの拡張子を取得（例: ".heic", ".pdf"）
+    ext = os.path.splitext(upload.filename)[1].lower()
+    valid_extensions = {".jpg", ".jpeg", ".png", ".pdf", ".heic", ".heif", ".webp"}
+    
+    if upload.content_type not in ALLOWED_CONTENT_TYPES and ext not in valid_extensions:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="許可されていないファイル形式です。JPEG/PNG/PDFのみアップロード可能です。",
+            detail=f"許可されていないファイル形式です。({upload.content_type} / {ext})",
         )
         
     data = await upload.read()
@@ -238,7 +250,7 @@ def set_cookie(request: TokenRequest, response: Response):
         key="token",
         value=request.token,
         httponly=True,             # prohibit access from JS to prevent XSS attack
-        secure=True,               # only transmit when the scheme is https
+        secure=IS_PRODUCTION,               # only transmit when the scheme is https
         samesite="lax",            # prevent CSRF
         max_age=3600, 
         path="/"          
@@ -477,6 +489,26 @@ async def add_task_post(
     )
 
 
+@app.post("/delete-task/{plan_id}")
+def delete_task(
+    request: Request,
+    plan_id: int = None,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user)
+):
+    if plan_id is None:
+        return RedirectResponse(url="/", status_code=status.HTTP_404_NOT_FOUND)
+    
+    task = db.query(models.StudyPlan).filter(models.StudyPlan.id == plan_id).first()
+    if task:
+        db.delete(task)
+        db.commit()
+        
+    referer = request.headers.get("referer", "/")
+    return RedirectResponse(url=referer, status_code=303)
+    
+
+
 @app.get('/study')
 def study(request: Request, db: Session = Depends(get_db)):
     pass
@@ -488,7 +520,7 @@ def register_problem(request: Request, user: models.User = Depends(get_current_u
 
 
 @app.post("/register-problem")
-def register_post(
+async def register_post(
     request: Request,
     db: Session = Depends(get_db),
     image: UploadFile = File(...), 
@@ -500,7 +532,16 @@ def register_post(
 ):
     problem_image_path = None
     if image:
-        result = cloudinary.uploader.upload(image.file)
+        validated_image = await validate_upload_image(image)
+        ext = os.path.splitext(image.filename)[1].lower()
+        
+        if ext == ".pdf":
+            # PDFの場合はそのまま（複数ページ）保存
+            result = cloudinary.uploader.upload(validated_image, format="pdf")
+        else:
+            # 画像(HEIC含む)の場合は強制的にJPGに変換
+            result = cloudinary.uploader.upload(validated_image, format="jpg")
+            
         problem_image_path = result.get("secure_url")
             
     if source:
@@ -566,7 +607,7 @@ def solve(
              "request": request}
         )
         
-    else: RedirectResponse(url="/home", status_code=status.HTTP_404_NOT_FOUND)
+    else: RedirectResponse(url="/", status_code=status.HTTP_404_NOT_FOUND)
     
 
 @app.post('/submit-answer/{problem_id}')
@@ -577,6 +618,13 @@ async def submit_answer(
     answer_image: UploadFile = File(...),
     user: models.User = Depends(get_current_user)
 ):
+    """ Validation of file_type """
+    if answer_image.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid file type: {answer_image.content_type}"
+        )
+    
     """ Add constraints of use of AI """
 
     today_start = datetime.combine(datetime.today(), time.min)
@@ -604,7 +652,12 @@ async def submit_answer(
         return RedirectResponse(url="/", status_code=status.HTTP_404_NOT_FOUND)
        
     answer_bytes = await validate_upload_image(answer_image)
-    result = cloudinary.uploader.upload(answer_bytes)
+    ext = os.path.splitext(answer_image.filename)[1].lower()
+    if ext == ".pdf":
+        result = cloudinary.uploader.upload(answer_bytes, format="pdf")
+    else:
+        result = cloudinary.uploader.upload(answer_bytes, format="jpg")
+        
     save_path = result.get("secure_url")
     
     contents = []
@@ -633,9 +686,10 @@ async def submit_answer(
             response = requests.get(path, timeout=10)
             response.raise_for_status()
             image_bytes = response.content
+            content_type = response.headers.get('Content-Type', 'image/jpeg')
             
             image_content = types.Part.from_bytes(
-                data=image_bytes, mime_type="image/jpeg"
+                data=image_bytes, mime_type=content_type
             )
             contents.append(image_content)
 
@@ -650,8 +704,16 @@ async def submit_answer(
         )
     
     # Input answer paper
+    mime_type = answer_image.content_type
+    if ext in [".heic", ".heif"]:
+        mime_type = "image/heic"
+    elif ext == ".pdf":
+        mime_type = "application/pdf"
+    elif mime_type not in ALLOWED_CONTENT_TYPES:
+        mime_type = "image/jpeg" # どれにも当てはまらない場合はJPEGとみなす
+        
     answer_content = types.Part.from_bytes(
-        data=answer_bytes, mime_type=answer_image.content_type
+        data=answer_bytes, mime_type=mime_type
     )
     contents.append(answer_content)
     

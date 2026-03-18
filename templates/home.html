@@ -37,6 +37,11 @@
                                         </a>
                                         <span style="color: #d32f2f; font-size: 0.9em;">[未完了]</span>
                                         </li>
+                                        <form action="/delete-task/{{ plan.id }}" method="post" onsubmit="return confirm('本当にこのタスクを削除しますか？');">
+                                            <button type="submit" style="display: inline-block; background-color: #56bc17; color: white; text-decoration: none; padding: 8px 15px; border-radius: 4px; font-size: 0.9em; font-weight: bold; margin-bottom: 10px;">
+                                                タスクを削除
+                                            </button>
+                                        </form>
                                     {% endif %}
                                 {% endfor %}
                             </ul>
