@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ログイン - NextLearn</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f7f6; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-container { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
+        h2 { color: #333; margin-bottom: 30px; }
+        .btn { width: 100%; padding: 12px; margin-bottom: 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; transition: background 0.3s; }
+        .btn-google { background-color: #4285F4; color: white; }
+        .btn-google:hover { background-color: #357ae8; }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h2>NextLearn ログイン</h2>
+        <button id="google-login-btn" class="btn btn-google" style="background-color: green;">Googleでログイン</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+        const firebaseConfig = {
+        apiKey: "AIzaSyCNrpxL4Sg03yk2Ezl3M_QCPm8M4-OGkpE",
+        authDomain: "nextlearn-a6984.firebaseapp.com",
+        projectId: "nextlearn-a6984",
+        storageBucket: "nextlearn-a6984.firebasestorage.app",
+        messagingSenderId: "370662246065",
+        appId: "1:370662246065:web:9b43274b2c05c264c88490"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const googleProvider = new GoogleAuthProvider();
+
+        // 「/logout」からのリダイレクトかどうかを判定
+        const params = new URL(window.location.href).searchParams;
+        const isLoggedOut = params.get("logged_out") === "1";
+
+        // ログアウト直後の1回だけ、Firebase側も確実にサインアウトしてから
+        // クエリパラメータを消した /login に遷移し直す
+        if (isLoggedOut) {
+            (async () => {
+                try {
+                    await signOut(auth);
+                } finally {
+                    // ?logged_out=1 を取り除いたURLに差し替える
+                    window.location.replace("/login");
+                }
+            })();
+        }
+
+        document.getElementById('google-login-btn').addEventListener('click', async () => {
+            try {
+                await signInWithPopup(auth, googleProvider);
+            } catch (error) {
+                alert("ログインエラー: " + error.message);
+            }
+        });
+
+
+        // login.html の修正部分
+        onAuthStateChanged(auth, async (user) => {
+            // 【追加】ログアウト処理中なら、ここで処理をストップして自動ログインを防ぐ！
+            if (isLoggedOut) {
+                return;
+            }
+
+            if (!user) {
+                return;
+            }
+
+            const token = await user.getIdToken();
+            
+            try {
+                const response = await fetch("/api/auth/session", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ id_token: token })
+                });
+
+                // バックエンドが問題なくCookieをセットしてくれたら、ホーム画面へ移動
+                if (response.ok) {
+                    window.location.href = "/"; 
+                } else {
+                    alert("ログイン処理に失敗しました。");
+                    await signOut(auth); // 念のためサインアウトさせておく
+                }
+            } catch (error) {
+                console.error("通信エラー:", error);
+                alert("サーバーとの通信に失敗しました。");
+            }
+        });
+    </script>
+</body>
+</html>

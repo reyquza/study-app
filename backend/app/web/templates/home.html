@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block title %}
+{% endblock %}
+
+{% block content %}
+    {% if error_message %}
+        <div style="background-color: #ffebee; color: #c62828; padding: 15px; margin-bottom: 20px; border-radius: 5px; border: 1px solid #ef9a9a; text-align: center; font-weight: bold;">
+            {{ error_message }}
+        </div>
+    {% endif %}
+    <header>
+        <h3 style="text-align: center;">何やってるんですか　勉強してください！</h3>
+    </header>
+    
+    <main>
+        <div class="today-section">
+            <p>今日の日付： <strong>{{ today.strftime("%Y-%m-%d") }}</strong></p>
+        </div>
+
+        <div class="calendar-section">
+            <h4>未完了のToDo</h4>
+            <div>3日後までの未完了のToDoが表示されます</div>
+            {% if calendar_data %}
+                <div class="schedule-list">
+                    {% for plan_date, daily_plans in calendar_data.items() %}
+                        <div class="day-block">
+                            <h5 class="date-header">{{ plan_date }}のToDo</h5>
+                            <ul>
+                                {% for plan in daily_plans %}
+                                    {% if plan.is_completed == False %}
+                                        <li>
+                                        <span style="font-size: 0.9em; color: #666;">問題ID: {{ plan.problem_id }}</span>
+                                        <a href="/solve/{{ plan.problem_id }}" style="color: inherit; text-decoration: none; font-weight: bold; display: block; margin: 5px 0;">
+                                            {{ plan.problem.source }}
+                                        </a>
+                                        <span style="color: #d32f2f; font-size: 0.9em;">[未完了]</span>
+                                        </li>
+                                        <form action="/delete-task/{{ plan.id }}" method="post" onsubmit="return confirm('本当にこのタスクを削除しますか？');">
+                                            <button type="submit" style="display: inline-block; background-color: #56bc17; color: white; text-decoration: none; padding: 8px 15px; border-radius: 4px; font-size: 0.9em; font-weight: bold; margin-bottom: 10px;">
+                                                タスクを削除
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p>現在、未完了のTodoはありません。</p>
+            {% endif %}
+        </div>
+        <br>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 15px; margin-top: 30px; margin-bottom: 20px;">
+            <a href="/schedule" class="rounded-btn">予定表を確認・編集する</a>
+            <a href="/register-problem" class="rounded-btn">問題を登録する</a>
+        </div>
+    </main>
+{% endblock content %}

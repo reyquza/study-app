@@ -1,72 +1,68 @@
-### Technical Stacks
-Backend: FastAPI
-Database: SQLite (& SQLAlchemy)
-Frontend: Next.js or Vanilla, Vercel
-AI, graph recognition: Gemini1.5 Flash or Pro
+# NextLearn
 
-### Architechture
-1. 問題の登録: 問題集の写真を撮る → スマホからアプリにアップロード → 画像データのままSQLite（またはローカルディレクトリ）にパスを保存。
+AI grading for handwritten math answers. A student photographs a problem and their
+handwritten solution; NextLearn scores it out of 100 with partial credit, explains
+where the reasoning went wrong, and schedules the problem for review.
 
-2. 解答の採点: 妹さんがノートに解いた解答の写真を撮る → アプリにアップロード。
+I built the first version in March 2026, shortly after I started programming, for my
+sister, who was preparing for a Japanese university entrance exam. Version 2, in progress
+on this branch, is about one question: **how far can an AI grader's score be trusted,
+and can the app tell when it should not be?**
 
-3. AIへのプロンプト（API呼び出し）:
- Flask/FastAPI側から、Gemini APIに対して**「問題の画像」と「妹さんの解答の画像」の2枚を同時に送信**し、以下のようなプロンプトを与えます。
+## Status
 
- 「あなたは九州大学の受験指導に長けたプロの数学講師です。
- 画像1は九大文系レベルの数学の問題、画像2は生徒の記述式解答です。
- 以下のステップで採点と解説を行ってください。
+| | |
+|---|---|
+| ✅ | Problem registration (photo or PDF), study calendar, daily to-do list |
+| ✅ | Grading with Gemini through structured output (score, feedback, model answer) |
+| ✅ | Google sign-in (Firebase) with 14-day httpOnly session cookies, email allowlist |
+| ✅ | v2 layout: thin routes over a service layer, grading engine behind a `Grader` interface, tests |
+| 🚧 | Grading as background jobs, so a slow model call never blocks the server |
+| 🚧 | Rubric-based, step-by-step grading with repeated sampling and a confidence signal |
+| 🚧 | Evaluation harness and a public reliability report on human-graded answers |
+| 🚧 | Mistake taxonomy, weakness view, spaced-repetition review |
+| 🚧 | Next.js frontend, English UI, deployment |
 
- 解答の論理展開に飛躍や計算ミスがないかステップごとに確認する
+## Repository layout
 
- 100点満点で採点する（部分点も考慮する）
+```
+backend/                  FastAPI app (Python 3.11+, uv)
+  app/
+    main.py               app setup: middleware, error handling, routers
+    config.py             all settings, read from environment variables
+    database.py, models.py
+    routers/              JSON API under /api (auth, users)
+    services/             business logic: problems, plans, submissions, storage, auth
+    grading/              grading engine: Grader interface, Gemini implementation, prompts
+    web/                  interim server-rendered UI (Jinja2), to be replaced by frontend/
+  alembic/                database migrations
+  tests/                  pytest suite; Firebase, Cloudinary and Gemini are faked
+  scripts/serve_lan.py    serve on the home network with a QR code for phones
+docs/                     development log and the original (Japanese) plan
+```
 
- 生徒がどこで間違えたか、どう考えればよかったのかを優しく解説する」
+Routes only parse input, call `app.services`, and render or serialize the result. The
+web pages and the JSON API therefore share the same logic, and moving the UI to Next.js
+means adding API routes and a frontend, not rewriting the backend. The `grading` package
+is the single entry point for grading, so the evaluation harness will measure exactly the
+code that runs in production.
 
-### Operation procedures
-自宅Wi-Fiを利用したローカルサーバー方式（PC ＋ スマホ）
-アプリ（Flask/FastAPI + SQLite）はPC上で動かしますが、同じ家のWi-Fiに繋がっていれば、妹さんのスマホのブラウザからそのアプリにアクセスできます。
-- 仕組み:
-あなた、もしくは妹さんのPCでFlask/FastAPIサーバーを立ち上げます（例：http://0.0.0.0:8000 でホスト）。
-PCのローカルIPアドレス（例：192.168.1.10）を確認します。
-妹さんのスマホのSafariやChromeで http://192.168.1.10:8000 にアクセスします。
+## Running locally
 
-- メリット:
-インターネット上に公開しないため、セキュリティリスクがほぼゼロ。
-スマホのカメラで写真を撮って、そのままブラウザ経由でPC内のSQLiteに保存できる。
-複雑なビルド作業（アプリのパッケージ化など）が不要。
+```bash
+cd backend
+cp .env.example .env              # then fill in the keys
+# put the Firebase service-account key at backend/firebase-credentials.json
+uv sync
+uv run alembic upgrade head
+uv run uvicorn app.main:app --reload
+```
 
-- デメリット:
-アプリを使うときは、PCの電源が入っていてサーバーが動いている必要がある。
-自宅のWi-Fi圏外（カフェなど）では使えない。
+Open http://localhost:8000. API docs are at http://localhost:8000/docs.
 
-### Plan
-1. データベースの作成
-- ToDoスケジュール表
-- 問題(問題文・解いた回数・created_at・solved_at・AIからの回答解説・答案・メモ・点数)
+## Tests
 
-### 03-06 Day2
-- AIによる自動解説機能基礎実装成功 だがまだ改善の余地あり
-  1. 回答の数式や図・表などが反映されない　数式もTexとして表示されない *03-07*
-  2. 体感待ち時間が長いので、ストリーミング方式にするのは必須か *03-07*
-  3. PDFファイルなども読み込めるようにしたい。
-  4. プロンプトエンジニアリングにより、回答の精度を上げたい
-- 問題登録機能や今までの進捗確認サイトの制作 *登録 03-07*
-- alembicの実装 *03-07*
-- AIレコメンド機能
-- tag登録 *03-07 tag selectはまだ*
-  
-### 03-07 Day3
-- 問題登録ページの実装
-  遭遇バグ
-  - Form(...)ではなくForm(None)にする
-  - tagがマスターテーブル・tag classのため、その調整が難しかった。
-- 答案送信時の送信中表示画面の実装と、二重クリック防止機能の実装。SSEストリーミング方式は構造化出力と相性が悪いため
-今回はあきらめた。(正規表現などによるキー検知が必要)
-- alembicの導入
-- その他バグ改善
-  - register-problem: scheduleをカレンダー表示＆date型に
-  - answer: 問題も表示されるように
-  - home: 開発のため、完了未完了関わらず、すべてのタスクを表示
-
-### 03-08 Day4
-
+```bash
+cd backend
+uv run pytest
+```
