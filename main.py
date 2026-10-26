@@ -12,6 +12,7 @@ import firebase_admin
 from firebase_admin import credentials, auth
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Depends, Form, status, UploadFile, File, Response, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -103,6 +104,7 @@ cloudinary.config(
 
 DAILY_LIMIT = 5
 fetch_limit = 30
+SESSION_LIFETIME = timedelta(days=14)  # Firebaseのセッションクッキーの上限は2週間
 
 
 # """ 動作確認用 """
@@ -157,14 +159,15 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
         raise NotAuthenticatedException()
     
     try:
-        decoded_token = auth.verify_id_token(token)
+        # IDトークン(1時間で失効)ではなく、/set-cookieで発行したセッションCookieを検証する
+        decoded_token = auth.verify_session_cookie(token)
         uid = decoded_token.get('uid')
         email = decoded_token.get('email')
         email_verified = decoded_token.get('email_verified')
-        
-        
+
+
         # リストにないメールアドレスの場合はエラーにして弾く
-        if email.lower() not in WHITELISTS or not email_verified:
+        if not email or email.lower() not in WHITELISTS or not email_verified:
             print(f"不正なログイン試行をブロックしました: {email}")
             raise NotAuthenticatedException()
         
@@ -203,6 +206,23 @@ async def validate_upload_image(upload: UploadFile):
     return data
     
 
+def complete_plans_for_problem(db: Session, problem_id: int):
+    """答案を提出したら、その問題の今日までの未完了タスクを完了にする。
+       今日までのタスクがなければ（先取りで解いた場合）、一番近い未完了タスクを完了にする。"""
+    pending_plans = db.scalars(
+        select(models.StudyPlan)
+        .where(models.StudyPlan.problem_id == problem_id)
+        .where(models.StudyPlan.is_completed.is_(False))
+        .order_by(models.StudyPlan.scheduled_date)
+    ).all()
+
+    today = date.today()
+    due_plans = [plan for plan in pending_plans if plan.scheduled_date <= today]
+
+    for plan in due_plans or pending_plans[:1]:
+        plan.is_completed = True
+
+
 def ensure_url(url: str):
     if not url:
          raise HTTPException(status_code=400, detail="URL is missing")
@@ -240,20 +260,21 @@ def login_page(request: Request):
 """ set cookie """
 @app.post("/set-cookie")
 def set_cookie(request: TokenRequest, response: Response):
-    # verify the token sended from the frontend
+    # verify the token sended from the frontend, then exchange it for a long-lived session cookie
     try:
-        decoded_token = auth.verify_id_token(request.token)
-    except Exception as e:
+        auth.verify_id_token(request.token)
+        session_cookie = auth.create_session_cookie(request.token, expires_in=SESSION_LIFETIME)
+    except Exception:
         raise HTTPException(status_code=401, detail="Invalid Token")
-    
+
     response.set_cookie(
         key="token",
-        value=request.token,
+        value=session_cookie,
         httponly=True,             # prohibit access from JS to prevent XSS attack
         secure=IS_PRODUCTION,               # only transmit when the scheme is https
         samesite="lax",            # prevent CSRF
-        max_age=3600, 
-        path="/"          
+        max_age=int(SESSION_LIFETIME.total_seconds()),
+        path="/"
     )
     
     return {"status": "success"}
@@ -266,7 +287,7 @@ def logout():
     response = RedirectResponse(url="/login?logged_out=1", status_code=status.HTTP_303_SEE_OTHER)
     
     # 【超重要】ここでバックエンドのCookie（リストバンド）を確実に破棄する！
-    response.delete_cookie(key="token", path="/", httponly=True, secure=True, samesite="lax")
+    response.delete_cookie(key="token", path="/", httponly=True, secure=IS_PRODUCTION, samesite="lax")
     
     return response
 
@@ -285,6 +306,7 @@ def home(
         select(models.StudyPlan)
         .join(models.Problem)
         .where(models.Problem.user_id == user.id)
+        .where(models.StudyPlan.is_completed.is_(False))
         .where(models.StudyPlan.scheduled_date <= today+timedelta(days=3))
         .order_by(models.StudyPlan.scheduled_date)
     ).all()
@@ -411,7 +433,7 @@ def confirm_task(
     user: models.User = Depends(get_current_user)
 ):
     if problem_id is None:
-        return RedirectResponse(url="/", status_code=status.HTTP_400_BAD_REQUEST)
+        return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     
     problem = db.query(models.Problem).filter(
         models.Problem.id == problem_id, 
@@ -419,7 +441,7 @@ def confirm_task(
     ).first()
     
     if not problem:
-        return RedirectResponse(url="/", status_code=status.HTTP_400_BAD_REQUEST)
+        return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     
     submissions = db.query(models.Submission).filter(
         models.Submission.problem_id==problem_id).all()
@@ -497,9 +519,13 @@ def delete_task(
     user: models.User = Depends(get_current_user)
 ):
     if plan_id is None:
-        return RedirectResponse(url="/", status_code=status.HTTP_404_NOT_FOUND)
-    
-    task = db.query(models.StudyPlan).filter(models.StudyPlan.id == plan_id).first()
+        return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+
+    # 自分の問題に紐づくタスクだけ削除できるようにする（他人のplan_idを指定されても消さない）
+    task = db.query(models.StudyPlan).join(models.Problem).filter(
+        models.StudyPlan.id == plan_id,
+        models.Problem.user_id == user.id
+    ).first()
     if task:
         db.delete(task)
         db.commit()
@@ -535,12 +561,13 @@ async def register_post(
         validated_image = await validate_upload_image(image)
         ext = os.path.splitext(image.filename)[1].lower()
         
+        # アップロードは同期APIなので、スレッドプールで実行してイベントループを止めない
         if ext == ".pdf":
             # PDFの場合はそのまま（複数ページ）保存
-            result = cloudinary.uploader.upload(validated_image, format="pdf")
+            result = await run_in_threadpool(cloudinary.uploader.upload, validated_image, format="pdf")
         else:
             # 画像(HEIC含む)の場合は強制的にJPGに変換
-            result = cloudinary.uploader.upload(validated_image, format="jpg")
+            result = await run_in_threadpool(cloudinary.uploader.upload, validated_image, format="jpg")
             
         problem_image_path = result.get("secure_url")
             
@@ -606,8 +633,8 @@ def solve(
             {"problem": problem,
              "request": request}
         )
-        
-    else: RedirectResponse(url="/", status_code=status.HTTP_404_NOT_FOUND)
+
+    return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     
 
 @app.post('/submit-answer/{problem_id}')
@@ -618,13 +645,9 @@ async def submit_answer(
     answer_image: UploadFile = File(...),
     user: models.User = Depends(get_current_user)
 ):
-    """ Validation of file_type """
-    if answer_image.content_type not in ALLOWED_CONTENT_TYPES:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Invalid file type: {answer_image.content_type}"
-        )
-    
+    # ファイル形式のチェックは validate_upload_image で行う
+    # (iPhoneのHEICは content_type が application/octet-stream になることがあり、拡張子でも判定する必要がある)
+
     """ Add constraints of use of AI """
 
     today_start = datetime.combine(datetime.today(), time.min)
@@ -646,17 +669,20 @@ async def submit_answer(
     problem = db.query(models.Problem).filter(
         models.Problem.id==problem_id,
         models.Problem.user_id == user.id
-    ).one()
-    
+    ).first()
+
     if not problem:
-        return RedirectResponse(url="/", status_code=status.HTTP_404_NOT_FOUND)
-       
+        return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+
+    if not problem.problem_image_path and not problem.problem_text:
+        return RedirectResponse(url=f"/solve/{problem_id}", status_code=status.HTTP_303_SEE_OTHER)
+
     answer_bytes = await validate_upload_image(answer_image)
     ext = os.path.splitext(answer_image.filename)[1].lower()
     if ext == ".pdf":
-        result = cloudinary.uploader.upload(answer_bytes, format="pdf")
+        result = await run_in_threadpool(cloudinary.uploader.upload, answer_bytes, format="pdf")
     else:
-        result = cloudinary.uploader.upload(answer_bytes, format="jpg")
+        result = await run_in_threadpool(cloudinary.uploader.upload, answer_bytes, format="jpg")
         
     save_path = result.get("secure_url")
     
@@ -683,7 +709,7 @@ async def submit_answer(
         ensure_url(path)
         
         try:
-            response = requests.get(path, timeout=10)
+            response = await run_in_threadpool(requests.get, path, timeout=10)
             response.raise_for_status()
             image_bytes = response.content
             content_type = response.headers.get('Content-Type', 'image/jpeg')
@@ -696,13 +722,7 @@ async def submit_answer(
         except requests.exceptions.RequestException as e:
             print(f"画像取得エラー: {e}")
             raise HTTPException(status_code=400, detail="画像の取得に失敗しました。")
-        
-    else: 
-        return RedirectResponse(
-        url=f"/solve/{problem_id}",
-        status_code=status.HTTP_404_NOT_FOUND
-        )
-    
+
     # Input answer paper
     mime_type = answer_image.content_type
     if ext in [".heic", ".heif"]:
@@ -718,16 +738,24 @@ async def submit_answer(
     contents.append(answer_content)
     
     
-    response = client.models.generate_content(
-        model='gemini-3-flash-preview',
-        contents=contents,
-        config={
-            "response_mime_type": "application/json",
-            "response_json_schema": Reply.model_json_schema(),
-        },
-    )
-    
-    reply = Reply.model_validate_json(response.text)
+    # Gemini SDKの同期呼び出しは数十秒かかるため、スレッドプールで実行して他のリクエストを止めない
+    try:
+        response = await run_in_threadpool(
+            client.models.generate_content,
+            model='gemini-3-flash-preview',
+            contents=contents,
+            config={
+                "response_mime_type": "application/json",
+                "response_json_schema": Reply.model_json_schema(),
+            },
+        )
+        reply = Reply.model_validate_json(response.text)
+    except Exception as e:
+        print(f"AI採点エラー: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="AIによる採点に失敗しました。時間をおいて再度お試しください。",
+        )
 
     new_submission = models.Submission(
         problem_id=problem_id,
@@ -737,11 +765,12 @@ async def submit_answer(
         explanation=reply.explanation,
     )
     db.add(new_submission)
+    complete_plans_for_problem(db, problem_id)
     db.commit()
     db.refresh(new_submission)
-    
+
     return RedirectResponse(
-        url=f"/answer/{new_submission.id}", 
+        url=f"/answer/{new_submission.id}",
         status_code=status.HTTP_303_SEE_OTHER
     )
     
@@ -760,13 +789,7 @@ def answer(
     ).first()
     if not submission:
         return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
-    
-    studyplan = db.query(models.StudyPlan).filter(models.StudyPlan.problem_id == submission.problem_id).one()
-    if studyplan:
-        studyplan.is_completed = True
-        db.commit()
-    
-    
+
     return templates.TemplateResponse(
         'answer.html',
         {
@@ -796,11 +819,11 @@ async def update_memo(
         submission.mistake = mistake
         submission.user_memo = user_memo
         db.commit()
-        
-        return RedirectResponse(
-            url="/", 
-            status_code=status.HTTP_303_SEE_OTHER
-        )
+
+    return RedirectResponse(
+        url="/",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
     
       
     
