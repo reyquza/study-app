@@ -1,5 +1,7 @@
 # NextLearn
 
+[![CI](https://github.com/reyquza/study-app/actions/workflows/ci.yml/badge.svg)](https://github.com/reyquza/study-app/actions/workflows/ci.yml)
+
 AI grading for handwritten math answers. A student photographs a problem and their
 handwritten solution; NextLearn scores it out of 100 with partial credit, explains
 where the reasoning went wrong, and schedules the problem for review.
@@ -93,3 +95,7 @@ on the private network. Production needs `APP_ENV=production`, `JWT_SECRET_KEY`,
 cd backend
 uv run pytest
 ```
+
+CI also runs the migrations against Postgres (upgrade, model check, full rollback) and a
+test where 8 workers claim jobs concurrently, which SQLite cannot exercise. Locally, set
+`POSTGRES_TEST_URL` to run that test.
