@@ -1,9 +1,11 @@
+import enum
 from datetime import date, datetime
 from typing import Optional
+from uuid import uuid4
 
-from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Table, Text
+from sqlalchemy import Boolean, Column, Date, DateTime, Enum, ForeignKey, Index, Integer, String, Table, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
+from sqlalchemy.sql import false, func
 
 from app.database import Base
 
@@ -11,9 +13,12 @@ from app.database import Base
 class User(Base):
     __tablename__ = "users"
 
-    # Firebase Auth UID.
-    id: Mapped[str] = mapped_column(String(128), primary_key=True)
-    email: Mapped[Optional[str]] = mapped_column(String(255))
+    # Random, so IDs in URLs and tokens reveal nothing about other accounts.
+    id: Mapped[str] = mapped_column(String(128), primary_key=True, default=lambda: uuid4().hex)
+    # Stored lower-cased. Guests have neither an email nor a password until they sign up.
+    email: Mapped[Optional[str]] = mapped_column(String(255), unique=True)
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255))
+    is_guest: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     problems: Mapped[list["Problem"]] = relationship(back_populates="user", cascade="all, delete-orphan")
@@ -56,6 +61,7 @@ class Problem(Base):
 
     submissions: Mapped[list["Submission"]] = relationship(back_populates="problem", cascade="all, delete-orphan")
     schedules: Mapped[list["StudyPlan"]] = relationship(back_populates="problem", cascade="all, delete-orphan")
+    grading_jobs: Mapped[list["GradingJob"]] = relationship(back_populates="problem", cascade="all, delete-orphan")
 
     @property
     def solve_count(self) -> int:
@@ -96,3 +102,46 @@ class StudyPlan(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     problem: Mapped["Problem"] = relationship(back_populates="schedules")
+
+
+class JobStatus(str, enum.Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
+class GradingJob(Base):
+    """A request to grade one answer, processed in the background by app.worker.
+
+    The table is the queue: workers claim rows with SELECT ... FOR UPDATE SKIP LOCKED, and a
+    claim is a time-limited lease, so a job whose worker died is picked up again.
+    """
+
+    __tablename__ = "grading_jobs"
+    __table_args__ = (Index("ix_grading_jobs_status_run_after", "status", "run_after"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    problem_id: Mapped[int] = mapped_column(ForeignKey("problems.id"))
+    problem: Mapped["Problem"] = relationship(back_populates="grading_jobs")
+    answer_image_path: Mapped[str] = mapped_column(String(512))
+
+    status: Mapped[JobStatus] = mapped_column(
+        Enum(JobStatus, native_enum=False, length=16, values_callable=lambda e: [m.value for m in e]),
+        default=JobStatus.QUEUED,
+    )
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    # Not claimable before this time; pushed back after a failed attempt.
+    run_after: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    lease_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[Optional[str]] = mapped_column(Text)
+
+    # Which model graded the answer, so results can be compared across grader versions.
+    grader_model: Mapped[Optional[str]] = mapped_column(String(100))
+    submission_id: Mapped[Optional[int]] = mapped_column(ForeignKey("submissions.id"))
+    submission: Mapped[Optional["Submission"]] = relationship()
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

@@ -1,7 +1,11 @@
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy.orm import Session
 
-from app.config import IS_PRODUCTION, SESSION_COOKIE_NAME, SESSION_LIFETIME
-from app.schemas import SessionRequest, StatusResponse
+from app.database import get_db
+from app.dependencies import get_optional_user
+from app.models import User
+from app.schemas import LoginRequest, SignUpRequest, StatusResponse, UserResponse
+from app.security import clear_session_cookie, set_session_cookie
 from app.services import auth as auth_service
 
 
@@ -11,40 +15,44 @@ router = APIRouter(
 )
 
 
-def set_session_cookie(response: Response, session_cookie: str) -> None:
-    response.set_cookie(
-        key=SESSION_COOKIE_NAME,
-        value=session_cookie,
-        max_age=int(SESSION_LIFETIME.total_seconds()),
-        path="/",
-        httponly=True,  # not readable from JavaScript, which limits the damage of XSS
-        secure=IS_PRODUCTION,  # HTTPS only in production
-        samesite="lax",  # not sent on cross-site POSTs, which blocks CSRF
-    )
-
-
-def clear_session_cookie(response: Response) -> None:
-    response.delete_cookie(
-        key=SESSION_COOKIE_NAME,
-        path="/",
-        httponly=True,
-        secure=IS_PRODUCTION,
-        samesite="lax",
-    )
-
-
-@router.post("/session", response_model=StatusResponse)
-def create_session(body: SessionRequest, response: Response) -> StatusResponse:
+@router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def sign_up(
+    body: SignUpRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_user),
+) -> User:
     try:
-        session_cookie = auth_service.create_session_cookie(body.id_token)
-    except auth_service.AuthError:
+        user = auth_service.sign_up(db, body.email, body.password, guest=current_user)
+    except auth_service.EmailTaken:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid ID token",
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this email already exists",
         )
 
-    set_session_cookie(response, session_cookie)
-    return StatusResponse(status="ok")
+    set_session_cookie(response, user.id)
+    return user
+
+
+@router.post("/login", response_model=UserResponse)
+def login(body: LoginRequest, response: Response, db: Session = Depends(get_db)) -> User:
+    try:
+        user = auth_service.authenticate(db, body.email, body.password)
+    except auth_service.InvalidCredentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+        )
+
+    set_session_cookie(response, user.id)
+    return user
+
+
+@router.post("/guest", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def start_guest_session(response: Response, db: Session = Depends(get_db)) -> User:
+    user = auth_service.create_guest(db)
+    set_session_cookie(response, user.id)
+    return user
 
 
 @router.post("/logout", response_model=StatusResponse)

@@ -5,97 +5,123 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ログイン - NextLearn</title>
     <style>
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f7f6; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .login-container { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
-        h2 { color: #333; margin-bottom: 30px; }
-        .btn { width: 100%; padding: 12px; margin-bottom: 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; transition: background 0.3s; }
-        .btn-google { background-color: #4285F4; color: white; }
-        .btn-google:hover { background-color: #357ae8; }
+        *, *::before, *::after { box-sizing: border-box; }
+        body { font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif; background-color: #f4f7f6; color: #333; display: flex; justify-content: center; align-items: center; min-height: 100dvh; margin: 0; padding: 16px; }
+        .login-container { background: white; padding: 32px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        h2 { text-align: center; margin: 0 0 24px; }
+        .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #eee; }
+        .tab { flex: 1; padding: 10px; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; font-size: 15px; font-weight: bold; color: #888; cursor: pointer; }
+        .tab[aria-selected="true"] { color: #1976D2; border-bottom-color: #1976D2; }
+        label { display: block; font-size: 14px; margin-bottom: 4px; }
+        input { width: 100%; padding: 10px; margin-bottom: 14px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        .btn:disabled { opacity: 0.6; cursor: wait; }
+        .btn-primary { background-color: #1976D2; color: white; }
+        .btn-guest { background-color: white; color: #1976D2; border: 1px solid #1976D2; }
+        .hint { font-size: 12px; color: #888; margin: -8px 0 14px; }
+        .error { color: #c62828; font-size: 14px; min-height: 20px; margin: 0 0 10px; }
+        .divider { display: flex; align-items: center; gap: 10px; color: #aaa; font-size: 13px; margin: 20px 0; }
+        .divider::before, .divider::after { content: ""; flex: 1; border-top: 1px solid #eee; }
+        .guest-note { font-size: 12px; color: #888; text-align: center; margin: 8px 0 0; }
     </style>
 </head>
 <body>
     <div class="login-container">
-        <h2>NextLearn ログイン</h2>
-        <button id="google-login-btn" class="btn btn-google" style="background-color: green;">Googleでログイン</button>
+        <h2>NextLearn</h2>
+
+        {% if request.state.user and request.state.user.is_guest %}
+        <p class="guest-note" style="margin: 0 0 16px;">アカウントを作成すると、ゲストで登録した問題と採点結果がそのまま引き継がれます。</p>
+        {% endif %}
+
+        <div class="tabs" role="tablist">
+            <button class="tab" role="tab" data-mode="login" aria-selected="true">ログイン</button>
+            <button class="tab" role="tab" data-mode="signup" aria-selected="false">新規登録</button>
+        </div>
+
+        <form id="auth-form" novalidate>
+            <label for="email">メールアドレス</label>
+            <input id="email" name="email" type="email" autocomplete="email" required>
+
+            <label for="password">パスワード</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
+            <p id="password-hint" class="hint" hidden>8文字以上</p>
+
+            <p id="error" class="error" role="alert"></p>
+            <button id="submit" class="btn btn-primary" type="submit">ログイン</button>
+        </form>
+
+        {% if not request.state.user %}
+        <div class="divider">または</div>
+        <button id="guest" class="btn btn-guest" type="button">登録せずに試す（ゲスト）</button>
+        <p class="guest-note">ゲストのデータは、ログアウトするかCookieを消すと見られなくなります。</p>
+        {% endif %}
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    <script>
+    (() => {
+        const form = document.getElementById("auth-form");
+        const password = document.getElementById("password");
+        const submit = document.getElementById("submit");
+        const error = document.getElementById("error");
+        let mode = new URLSearchParams(location.search).get("mode") === "signup" ? "signup" : "login";
 
-        const firebaseConfig = {
-        apiKey: "AIzaSyCNrpxL4Sg03yk2Ezl3M_QCPm8M4-OGkpE",
-        authDomain: "nextlearn-a6984.firebaseapp.com",
-        projectId: "nextlearn-a6984",
-        storageBucket: "nextlearn-a6984.firebasestorage.app",
-        messagingSenderId: "370662246065",
-        appId: "1:370662246065:web:9b43274b2c05c264c88490"
+        const MESSAGES = {
+            401: "メールアドレスかパスワードが違います。",
+            409: "このメールアドレスはすでに登録されています。ログインしてください。",
+            422: mode => mode === "signup"
+                ? "メールアドレスの形式と、パスワードが8文字以上かを確認してください。"
+                : "メールアドレスの形式を確認してください。",
         };
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const googleProvider = new GoogleAuthProvider();
-
-        // 「/logout」からのリダイレクトかどうかを判定
-        const params = new URL(window.location.href).searchParams;
-        const isLoggedOut = params.get("logged_out") === "1";
-
-        // ログアウト直後の1回だけ、Firebase側も確実にサインアウトしてから
-        // クエリパラメータを消した /login に遷移し直す
-        if (isLoggedOut) {
-            (async () => {
-                try {
-                    await signOut(auth);
-                } finally {
-                    // ?logged_out=1 を取り除いたURLに差し替える
-                    window.location.replace("/login");
-                }
-            })();
+        function setMode(next) {
+            mode = next;
+            document.querySelectorAll(".tab").forEach(tab => {
+                tab.setAttribute("aria-selected", String(tab.dataset.mode === mode));
+            });
+            submit.textContent = mode === "signup" ? "登録してはじめる" : "ログイン";
+            password.autocomplete = mode === "signup" ? "new-password" : "current-password";
+            document.getElementById("password-hint").hidden = mode !== "signup";
+            error.textContent = "";
         }
 
-        document.getElementById('google-login-btn').addEventListener('click', async () => {
+        async function send(url, body) {
+            error.textContent = "";
+            document.querySelectorAll(".btn").forEach(btn => btn.disabled = true);
             try {
-                await signInWithPopup(auth, googleProvider);
-            } catch (error) {
-                alert("ログインエラー: " + error.message);
-            }
-        });
-
-
-        // login.html の修正部分
-        onAuthStateChanged(auth, async (user) => {
-            // 【追加】ログアウト処理中なら、ここで処理をストップして自動ログインを防ぐ！
-            if (isLoggedOut) {
-                return;
-            }
-
-            if (!user) {
-                return;
-            }
-
-            const token = await user.getIdToken();
-            
-            try {
-                const response = await fetch("/api/auth/session", {
+                const response = await fetch(url, {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ id_token: token })
+                    headers: { "Content-Type": "application/json" },
+                    body: body ? JSON.stringify(body) : undefined,
                 });
-
-                // バックエンドが問題なくCookieをセットしてくれたら、ホーム画面へ移動
                 if (response.ok) {
-                    window.location.href = "/"; 
-                } else {
-                    alert("ログイン処理に失敗しました。");
-                    await signOut(auth); // 念のためサインアウトさせておく
+                    location.replace("/");
+                    return;
                 }
-            } catch (error) {
-                console.error("通信エラー:", error);
-                alert("サーバーとの通信に失敗しました。");
+                const message = MESSAGES[response.status];
+                error.textContent = typeof message === "function" ? message(mode) : (message || "エラーが発生しました。もう一度お試しください。");
+            } catch {
+                error.textContent = "サーバーに接続できませんでした。";
             }
+            document.querySelectorAll(".btn").forEach(btn => btn.disabled = false);
+        }
+
+        document.querySelectorAll(".tab").forEach(tab => {
+            tab.addEventListener("click", () => setMode(tab.dataset.mode));
         });
+
+        form.addEventListener("submit", event => {
+            event.preventDefault();
+            send(`/api/auth/${mode}`, {
+                email: document.getElementById("email").value,
+                password: password.value,
+            });
+        });
+
+        const guest = document.getElementById("guest");
+        if (guest) guest.addEventListener("click", () => send("/api/auth/guest"));
+
+        setMode(mode);
+    })();
     </script>
 </body>
 </html>

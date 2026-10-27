@@ -37,9 +37,15 @@
         
         <div class="nav-right">
             {% if request.state.user %}
+            {% if request.state.user.is_guest %}
+            <span class="user-email">👤 ゲスト</span>
+            <br>
+            <a href="/login?mode=signup" class="logout-link" style="color: inherit; text-decoration: none;">アカウント登録</a>
+            {% else %}
             <span class="user-email">👤 {{ request.state.user.email }}</span>
             <br>
             <a href="/logout" class="logout-link" style="color: inherit; text-decoration: none;">ログアウト</a>
+            {% endif %}
             {% endif %}
         </div>
     </nav>

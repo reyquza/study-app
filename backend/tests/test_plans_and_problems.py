@@ -98,7 +98,7 @@ def test_register_problem_reuses_tags_and_schedules(client, db, users, stored_fi
     assert db.scalar(select(Tag.id).where(Tag.name == "数学")) is not None
     assert len(db.scalars(select(Tag)).all()) == 2
     assert [plan.scheduled_date for plan in problem.schedules] == [day]
-    assert stored_files == [b"png"]
+    assert list(stored_files.values()) == [b"png"]
 
 
 def test_parse_tag_names():

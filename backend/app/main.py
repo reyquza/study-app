@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -6,22 +7,39 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from app import config, worker
 from app.config import FRONTEND_ORIGINS
+from app.database import SessionLocal
 from app.dependencies import NotAuthenticated
-from app.routers import auth, users
-from app.services import auth as auth_service
+from app.grading.gemini import get_grader
+from app.routers import auth, grading, users
 from app.services import storage
 from app.web import routes as web_routes
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    auth_service.init_firebase()
     storage.init_storage()
+    if not config.RUN_WORKER_IN_PROCESS:
+        yield
+        return
+    if not config.GEMINI_API_KEY:
+        logger.warning("GEMINI_API_KEY is not set; answers will be queued but not graded")
+        yield
+        return
+
+    stop, task = await worker.start_local_worker(SessionLocal, get_grader())
     yield
+    stop.set()
+    try:
+        # Let in-flight gradings finish; anything cut off is retried once its lease expires.
+        await asyncio.wait_for(task, timeout=30)
+    except TimeoutError:
+        pass  # wait_for has cancelled the worker
 
 
 app = FastAPI(
@@ -70,4 +88,5 @@ app.mount("/static", StaticFiles(directory=web_routes.WEB_DIR / "static"), name=
 
 app.include_router(auth.router)
 app.include_router(users.router)
+app.include_router(grading.router)
 app.include_router(web_routes.router)

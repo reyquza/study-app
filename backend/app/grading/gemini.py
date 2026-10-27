@@ -13,7 +13,10 @@ from app.services.storage import FilePart
 
 class GeminiGrader:
     def __init__(self, api_key: str | None, model_name: str):
-        self._client = genai.Client(api_key=api_key)
+        self._client = genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(timeout=int(config.GRADING_TIMEOUT.total_seconds() * 1000)),
+        )
         self.model_name = model_name
 
     def grade(self, request: GradingRequest) -> GradingResult:

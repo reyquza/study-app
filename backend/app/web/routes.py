@@ -5,7 +5,6 @@ request, call app.services and render a template, so replacing them with JSON
 endpoints for the frontend does not touch any business logic.
 """
 
-import logging
 from datetime import date
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -15,20 +14,17 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app import clock, config
+from app import clock, config, worker
 from app.database import get_db
-from app.dependencies import get_current_user
-from app.grading.base import Grader, GradingFailed
-from app.grading.gemini import get_grader
-from app.models import User
-from app.routers.auth import clear_session_cookie
+from app.dependencies import get_current_user, get_optional_user
+from app.models import JobStatus, User
+from app.security import clear_session_cookie
+from app.services import grading_jobs
 from app.services import plans as plan_service
 from app.services import problems as problem_service
 from app.services import storage
 from app.services import submissions as submission_service
 
-
-logger = logging.getLogger(__name__)
 
 WEB_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=WEB_DIR / "templates")
@@ -49,14 +45,16 @@ def _parse_day(raw: str) -> date | None:
 
 
 @router.get("/login")
-def login_page(request: Request):
+def login_page(request: Request, user: User | None = Depends(get_optional_user)):
+    # Guests may open it to create an account; everyone else signed in goes home.
+    if user is not None and not user.is_guest:
+        return _redirect("/")
     return templates.TemplateResponse(request, "login.html")
 
 
 @router.get("/logout")
 def logout():
-    # ?logged_out=1 tells the login page to sign out of Firebase in the browser too.
-    response = _redirect("/login?logged_out=1")
+    response = _redirect("/login")
     clear_session_cookie(response)
     return response
 
@@ -244,7 +242,6 @@ async def submit_answer(
     answer_image: UploadFile = File(...),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-    grader: Grader = Depends(get_grader),
 ):
     problem = problem_service.get_user_problem(db, user.id, problem_id)
     if problem is None:
@@ -254,22 +251,31 @@ async def submit_answer(
 
     try:
         upload = await storage.read_validated_upload(answer_image)
-        submission = await submission_service.grade_submission(db, grader, user.id, problem, upload)
+        job = await grading_jobs.enqueue_grading(db, user.id, problem, upload)
     except storage.UploadRejected as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.message)
-    except submission_service.DailyLimitReached:
+    except grading_jobs.DailyLimitReached:
         return _redirect("/?error=limit_reached")
-    except storage.FileFetchFailed as exc:
-        logger.warning("Could not fetch problem file for problem %s: %s", problem_id, exc)
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="問題画像の取得に失敗しました。")
-    except GradingFailed as exc:
-        logger.warning("Grading failed for problem %s: %s", problem_id, exc)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="AIによる採点に失敗しました。時間をおいて再度お試しください。",
-        )
 
-    return _redirect(f"/answer/{submission.id}")
+    worker.notify_new_job()
+    return _redirect(f"/grading/{job.id}")
+
+
+@router.get("/grading/{job_id}")
+def grading_page(
+    request: Request,
+    job_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Waiting page. It polls /api/grading-jobs/{id} and moves on to the result when ready."""
+    job = grading_jobs.get_user_job(db, user.id, job_id)
+    if job is None:
+        return _redirect("/")
+    if job.status == JobStatus.SUCCEEDED:
+        return _redirect(f"/answer/{job.submission_id}")
+
+    return templates.TemplateResponse(request, "grading.html", {"job": job, "problem": job.problem})
 
 
 @router.get("/answer/{submission_id}")

@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block title %}
+    採点中
+{% endblock title %}
+
+{% block content %}
+    <style>
+        .grading-card { text-align: center; padding: 40px 20px; }
+        .grading-spinner {
+            width: 48px; height: 48px; margin: 0 auto 20px;
+            border: 4px solid #bbdefb; border-top-color: #1976D2; border-radius: 50%;
+            animation: grading-spin 1s linear infinite;
+        }
+        @keyframes grading-spin { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) { .grading-spinner { animation-duration: 3s; } }
+        .grading-failed .grading-spinner { display: none; }
+        .grading-note { color: #666; font-size: 0.9em; }
+    </style>
+
+    <div id="grading" class="day-block grading-card{% if job.status.value == 'failed' %} grading-failed{% endif %}"
+         data-job-url="/api/grading-jobs/{{ job.id }}">
+        <div class="grading-spinner" aria-hidden="true"></div>
+        <h3 id="grading-title" aria-live="polite">
+            {% if job.status.value == 'failed' %}採点できませんでした{% else %}AIが採点しています{% endif %}
+        </h3>
+        <p id="grading-detail" class="grading-note">
+            {% if job.status.value == 'failed' %}
+                時間をおいて、もう一度提出してください。今回の提出は1日の上限回数に数えません。
+            {% else %}
+                通常20〜40秒ほどかかります。このページは閉じても大丈夫です。結果はあとで問題の詳細から確認できます。
+            {% endif %}
+        </p>
+        <p id="grading-elapsed" class="grading-note"></p>
+        <a id="grading-retry" href="/solve/{{ problem.id }}"{% if job.status.value != 'failed' %} hidden{% endif %}>もう一度提出する</a>
+    </div>
+
+    <div style="margin-top: 20px; text-align: center;">
+        <a href="/" style="color: #666; text-decoration: none;">← ホームに戻る</a>
+    </div>
+
+    <noscript><meta http-equiv="refresh" content="5"></noscript>
+    <script>
+    (() => {
+        const card = document.getElementById("grading");
+        if (card.classList.contains("grading-failed")) return;
+
+        const title = document.getElementById("grading-title");
+        const detail = document.getElementById("grading-detail");
+        const elapsed = document.getElementById("grading-elapsed");
+        const startedAt = Date.now();
+
+        function showFailed() {
+            card.classList.add("grading-failed");
+            title.textContent = "採点できませんでした";
+            detail.textContent = "時間をおいて、もう一度提出してください。今回の提出は1日の上限回数に数えません。";
+            elapsed.textContent = "";
+            document.getElementById("grading-retry").hidden = false;
+        }
+
+        async function poll() {
+            elapsed.textContent = `${Math.round((Date.now() - startedAt) / 1000)}秒経過`;
+            try {
+                const response = await fetch(card.dataset.jobUrl, { headers: { Accept: "application/json" } });
+                if (response.status === 401) { location.href = "/login"; return; }
+                if (response.ok) {
+                    const job = await response.json();
+                    if (job.status === "succeeded") { location.replace(`/answer/${job.submission_id}`); return; }
+                    if (job.status === "failed") { showFailed(); return; }
+                    if (job.status === "queued" && job.attempts > 0) {
+                        detail.textContent = "AIが混み合っているため、自動で再試行しています…";
+                    }
+                }
+            } catch (error) {
+                // Network blip: keep polling.
+            }
+            setTimeout(poll, 1500);
+        }
+        setTimeout(poll, 1500);
+    })();
+    </script>
+{% endblock content %}

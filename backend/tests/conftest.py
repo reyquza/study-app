@@ -1,35 +1,35 @@
-from collections.abc import Generator
+import asyncio
+from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
 
 import pytest
-from fastapi import Depends, Request
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
+from app import config
+from app.config import SESSION_COOKIE_NAME
 from app.database import Base, get_db
-from app.dependencies import get_current_user
 from app.grading.base import GradingFailed, GradingRequest, GradingResult
-from app.grading.gemini import get_grader
 from app.main import app
 from app.models import User
-from app.services import auth as auth_service
+from app.security import create_session_token
 from app.services import storage
-
-
-STORED_URL = "https://res.cloudinary.com/demo/image/upload/answer.jpg"
+from app.worker import GradingWorker
 
 
 @dataclass
 class FakeGrader:
     model_name: str = "fake-grader"
     score: int = 70
-    fail: bool = False
+    # The next `failures` calls raise GradingFailed, like a model outage.
+    failures: int = 0
     requests: list[GradingRequest] = field(default_factory=list)
 
     def grade(self, request: GradingRequest) -> GradingResult:
         self.requests.append(request)
-        if self.fail:
+        if self.failures > 0:
+            self.failures -= 1
             raise GradingFailed("fake outage")
         return GradingResult(score=self.score, ai_feedback="feedback", explanation="model answer")
 
@@ -73,26 +73,29 @@ def grader() -> FakeGrader:
 
 
 @pytest.fixture
-def stored_files(monkeypatch) -> list[bytes]:
-    """Replaces Cloudinary: uploads are recorded instead of sent."""
-    uploaded: list[bytes] = []
+def stored_files(monkeypatch) -> dict[str, bytes]:
+    """Replaces Cloudinary with a dict of URL -> bytes. Files not uploaded in the test
+    (e.g. problem images made by factories) read back as b"problem-image"."""
+    files: dict[str, bytes] = {}
 
     async def fake_store(upload: storage.ValidatedUpload) -> str:
-        uploaded.append(upload.file.data)
-        return STORED_URL
+        url = f"https://res.cloudinary.com/demo/image/upload/{len(files)}.jpg"
+        files[url] = upload.file.data
+        return url
 
     async def fake_fetch(url: str) -> storage.FilePart:
-        return storage.FilePart(data=b"problem-image", mime_type="image/jpeg")
+        return storage.FilePart(data=files.get(url, b"problem-image"), mime_type="image/jpeg")
 
     monkeypatch.setattr(storage, "store_upload", fake_store)
     monkeypatch.setattr(storage, "fetch_stored_file", fake_fetch)
-    return uploaded
+    return files
 
 
 @pytest.fixture
 def anonymous_client(session_factory, monkeypatch) -> Generator[TestClient, None, None]:
-    monkeypatch.setattr(auth_service, "init_firebase", lambda: None)
     monkeypatch.setattr(storage, "init_storage", lambda: None)
+    # Tests drive the worker themselves through `run_jobs`.
+    monkeypatch.setattr(config, "RUN_WORKER_IN_PROCESS", False)
 
     def override_get_db() -> Generator[Session, None, None]:
         with session_factory() as session:
@@ -105,19 +108,25 @@ def anonymous_client(session_factory, monkeypatch) -> Generator[TestClient, None
 
 
 @pytest.fixture
-def client(anonymous_client, session_factory, users, grader, stored_files) -> TestClient:
+def client(anonymous_client, users, stored_files) -> TestClient:
     """A client signed in as alice. Call `login_as(client, "bob")` to switch users."""
     login_as(anonymous_client, "alice")
-    app.dependency_overrides[get_grader] = lambda: grader
     return anonymous_client
 
 
+@pytest.fixture
+def run_jobs(session_factory, grader) -> Callable[[], int]:
+    """Process every runnable grading job, as the background worker would. Returns how many ran."""
+    worker = GradingWorker(session_factory, grader, concurrency=1)
+
+    def run() -> int:
+        count = 0
+        while asyncio.run(worker.run_once()):
+            count += 1
+        return count
+
+    return run
+
+
 def login_as(client: TestClient, name: str) -> None:
-    uid = f"{name}-uid"
-
-    def override_current_user(request: Request, db: Session = Depends(get_db)) -> User:
-        user = db.get(User, uid)
-        request.state.user = user
-        return user
-
-    app.dependency_overrides[get_current_user] = override_current_user
+    client.cookies.set(SESSION_COOKIE_NAME, create_session_token(f"{name}-uid"))

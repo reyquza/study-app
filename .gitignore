@@ -16,7 +16,7 @@ next-env.d.ts
 # Secrets and local data
 .env
 .env.local
-firebase-credentials.json
+firebase-credential*
 *.db
 backend/app/web/static/images/
 
