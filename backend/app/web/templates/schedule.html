@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% block title %}予定表{% endblock title %}
+
+{% block content %}
+<style>
+    .calendar-container { margin-top: 20px; }
+    .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .calendar-table { width: 100%; border-collapse: collapse; table-layout: fixed; background-color: white; }
+    .calendar-table th, .calendar-table td { border: 1px solid #ddd; padding: 3px; vertical-align: top; }
+    .calendar-table th { text-align: center; background-color: #f5f5f5; height: 30px; font-weight: normal; color: #555; }
+    .calendar-table td { height: 100px; }
+    
+    /* 曜日ごとの色 */
+    .sun { color: #d32f2f; }
+    .sat { color: #1976D2; }
+
+    /* 日付セルのリンク全体をクリック可能にする */
+    .date-cell { text-decoration: none; color: inherit; display: block; height: 100%; box-sizing: border-box; }
+    .date-cell:hover { background-color: #f0f8ff; }
+    
+    .date-num { text-align: right; margin-bottom: 5px; font-size: 0.9em; color: #333; }
+    .today-marker { background-color: #1976D2; color: white; padding: 2px 6px; border-radius: 50%; font-weight: bold; }
+
+    /* ToDoバーのデザイン */
+    .todo-bar {
+        font-size: 10px;
+        background-color: #e3f2fd;
+        border-left: 3px solid #1976D2;
+        margin-bottom: 2px;
+        padding: 2px 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        border-radius: 2px;
+        color: #333;
+    }
+    .todo-bar.completed {
+        background-color: #f5f5f5;
+        border-left-color: #4CAF50;
+        color: #388e3c;
+        text-decoration: line-through;
+    }
+    .more-todos { font-size: 10px; color: #388e3c; text-align: right; padding-right: 2px; }
+    
+    /* 下部のナビゲーションボタン */
+    .month-nav {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 20px;
+    }
+    .month-nav a {
+        text-decoration: none;
+        background-color: #f0f0f0;
+        padding: 8px 15px;
+        border-radius: 4px;
+        color: #333;
+        font-size: 0.9em;
+    }
+    .month-nav a:hover { background-color: #e0e0e0; }
+</style>
+
+<div class="calendar-container">
+    <div class="calendar-header">
+        <h3 style="margin: 0;"><strong>{{ view.year }}年 {{ view.month }}月の予定</strong></h3>
+        <a href="/schedule" style="font-size: 0.9em; color: #1976D2; text-decoration: none;">今月へ戻る</a>
+        <a href="/" style="font-size: 0.9em; color: #1976D2; text-decoration: none;">ホームへ戻る</a>
+    </div>
+
+    <table class="calendar-table">
+        <tr>
+            <th class="sun">日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th class="sat">土</th>
+        </tr>
+        {% for week in view.weeks %}
+        <tr>
+            {% for day in week %}
+            <td style="background-color: {{ '#fcfcfc' if day == 0 else 'white' }};">
+                {% if day != 0 %}
+                    <a href="/schedule/{{ view.year }}-{{ '%02d' % view.month }}-{{ '%02d' % day }}" class="date-cell">
+                        <div class="date-num {% if day == 0 or day == 6 %}sat-sun{% endif %}">
+                            <span class="{% if view.year == today.year and view.month == today.month and day == today.day %}today-marker{% endif %}">
+                                {{ day }}
+                            </span>
+                        </div>
+                        
+                        {% set daily_plans = view.plans_by_day.get(day, []) %}
+                        
+                        {% for plan in daily_plans[:3] %}
+                            <div class="todo-bar {% if plan.is_completed %}completed{% endif %}">
+                                {{ plan.problem.source or "出典なし" }}
+                            </div>
+                        {% endfor %}
+                        
+                        {% if daily_plans|length > 3 %}
+                            <div class="more-todos">+{{ daily_plans|length - 3 }}件</div>
+                        {% endif %}
+                    </a>
+                {% endif %}
+            </td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </table>
+
+    <div class="month-nav">
+        <a href="/schedule?year={{ view.previous[0] }}&month={{ view.previous[1] }}">← 前の月へ</a>
+        <a href="/schedule?year={{ view.next[0] }}&month={{ view.next[1] }}">次の月へ →</a>
+    </div>
+    <br>
+    <br>
+    <br>
+    <br>
+</div>
+{% endblock content %}

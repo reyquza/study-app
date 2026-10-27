@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ログイン - NextLearn</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body { font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif; background-color: #f4f7f6; color: #333; display: flex; justify-content: center; align-items: center; min-height: 100dvh; margin: 0; padding: 16px; }
+        .login-container { background: white; padding: 32px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        h2 { text-align: center; margin: 0 0 24px; }
+        .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #eee; }
+        .tab { flex: 1; padding: 10px; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; font-size: 15px; font-weight: bold; color: #888; cursor: pointer; }
+        .tab[aria-selected="true"] { color: #1976D2; border-bottom-color: #1976D2; }
+        label { display: block; font-size: 14px; margin-bottom: 4px; }
+        input { width: 100%; padding: 10px; margin-bottom: 14px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        .btn:disabled { opacity: 0.6; cursor: wait; }
+        .btn-primary { background-color: #1976D2; color: white; }
+        .btn-guest { background-color: white; color: #1976D2; border: 1px solid #1976D2; }
+        .hint { font-size: 12px; color: #888; margin: -8px 0 14px; }
+        .error { color: #c62828; font-size: 14px; min-height: 20px; margin: 0 0 10px; }
+        .divider { display: flex; align-items: center; gap: 10px; color: #aaa; font-size: 13px; margin: 20px 0; }
+        .divider::before, .divider::after { content: ""; flex: 1; border-top: 1px solid #eee; }
+        .guest-note { font-size: 12px; color: #888; text-align: center; margin: 8px 0 0; }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h2>NextLearn</h2>
+
+        {% if request.state.user and request.state.user.is_guest %}
+        <p class="guest-note" style="margin: 0 0 16px;">アカウントを作成すると、ゲストで登録した問題と採点結果がそのまま引き継がれます。</p>
+        {% endif %}
+
+        <div class="tabs" role="tablist">
+            <button class="tab" role="tab" data-mode="login" aria-selected="true">ログイン</button>
+            <button class="tab" role="tab" data-mode="signup" aria-selected="false">新規登録</button>
+        </div>
+
+        <form id="auth-form" novalidate>
+            <label for="email">メールアドレス</label>
+            <input id="email" name="email" type="email" autocomplete="email" required>
+
+            <label for="password">パスワード</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
+            <p id="password-hint" class="hint" hidden>8文字以上</p>
+
+            <p id="error" class="error" role="alert"></p>
+            <button id="submit" class="btn btn-primary" type="submit">ログイン</button>
+        </form>
+
+        {% if not request.state.user %}
+        <div class="divider">または</div>
+        <button id="guest" class="btn btn-guest" type="button">登録せずに試す（ゲスト）</button>
+        <p class="guest-note">ゲストのデータは、ログアウトするかCookieを消すと見られなくなります。</p>
+        {% endif %}
+    </div>
+
+    <script>
+    (() => {
+        const form = document.getElementById("auth-form");
+        const password = document.getElementById("password");
+        const submit = document.getElementById("submit");
+        const error = document.getElementById("error");
+        let mode = new URLSearchParams(location.search).get("mode") === "signup" ? "signup" : "login";
+
+        const MESSAGES = {
+            401: "メールアドレスかパスワードが違います。",
+            409: "このメールアドレスはすでに登録されています。ログインしてください。",
+            422: mode => mode === "signup"
+                ? "メールアドレスの形式と、パスワードが8文字以上かを確認してください。"
+                : "メールアドレスの形式を確認してください。",
+        };
+
+        function setMode(next) {
+            mode = next;
+            document.querySelectorAll(".tab").forEach(tab => {
+                tab.setAttribute("aria-selected", String(tab.dataset.mode === mode));
+            });
+            submit.textContent = mode === "signup" ? "登録してはじめる" : "ログイン";
+            password.autocomplete = mode === "signup" ? "new-password" : "current-password";
+            document.getElementById("password-hint").hidden = mode !== "signup";
+            error.textContent = "";
+        }
+
+        async function send(url, body) {
+            error.textContent = "";
+            document.querySelectorAll(".btn").forEach(btn => btn.disabled = true);
+            try {
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: body ? JSON.stringify(body) : undefined,
+                });
+                if (response.ok) {
+                    location.replace("/");
+                    return;
+                }
+                const message = MESSAGES[response.status];
+                error.textContent = typeof message === "function" ? message(mode) : (message || "エラーが発生しました。もう一度お試しください。");
+            } catch {
+                error.textContent = "サーバーに接続できませんでした。";
+            }
+            document.querySelectorAll(".btn").forEach(btn => btn.disabled = false);
+        }
+
+        document.querySelectorAll(".tab").forEach(tab => {
+            tab.addEventListener("click", () => setMode(tab.dataset.mode));
+        });
+
+        form.addEventListener("submit", event => {
+            event.preventDefault();
+            send(`/api/auth/${mode}`, {
+                email: document.getElementById("email").value,
+                password: password.value,
+            });
+        });
+
+        const guest = document.getElementById("guest");
+        if (guest) guest.addEventListener("click", () => send("/api/auth/guest"));
+
+        setMode(mode);
+    })();
+    </script>
+</body>
+</html>
