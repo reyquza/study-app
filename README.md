@@ -79,6 +79,14 @@ uv run uvicorn app.main:app --reload
 
 Open http://localhost:8000. API docs are at http://localhost:8000/docs.
 
+## Deployment
+
+`backend/Dockerfile` builds one always-on container: it runs migrations, then serves the
+pages, the API and the in-process grading worker. It runs on any container host; the
+demo runs on Railway (`backend/railway.json` sets the health check) with Railway Postgres
+on the private network. Production needs `APP_ENV=production`, `JWT_SECRET_KEY`,
+`DATABASE_URL` and the Gemini and Cloudinary keys.
+
 ## Tests
 
 ```bash
