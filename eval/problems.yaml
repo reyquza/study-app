@@ -1,0 +1,186 @@
+# Evaluation problem set v1: four original problems in the style of the Kyushu University
+# humanities-track entrance exam, the exam NextLearn was first built for. They were written
+# for this study, so no model has seen them or their solutions in training.
+#
+# Each problem has three parts of rising difficulty: (1) textbook, (2) standard exam,
+# (3) Kyushu level. Most participants can do (1), so answers spread across the score range,
+# and grading accuracy can be compared by part difficulty.
+#
+# Each problem is worth 10 points. Rubrics were fixed on 2026-10-28, before any answer was
+# collected, and must not be edited after that: fix a mistake by adding a new set version.
+#
+# Rubric conventions, for human and AI graders alike:
+# - Steps are awarded independently unless `requires` says otherwise.
+# - An equivalent method earns the same points; `alternatives` maps common ones to steps.
+# - `caps` limit the points for answers that skip the reasoning.
+
+version: 1
+points_per_problem: 10
+
+problems:
+  - id: P1
+    topic: calculus, tangent lines and area
+    statement_ja: |
+      放物線 $C: y = x^2$ と点 $A(1, -3)$ がある。
+      (1) 点 $A$ を通る $C$ の接線の方程式をすべて求めよ。
+      (2) (1) で求めた接線と $C$ で囲まれた部分の面積 $S$ を求めよ。
+      (3) $a$ を実数とし、点 $(a, -3)$ を通る $C$ の2本の接線と $C$ で囲まれた部分の面積を $S(a)$ とする。$S(a)$ の最小値を求めよ。
+    statement_en: |
+      Let $C$ be the parabola $y = x^2$ and let $A = (1, -3)$.
+      (1) Find the equations of all tangent lines to $C$ that pass through $A$.
+      (2) Find the area $S$ of the region bounded by the tangent lines from (1) and $C$.
+      (3) For a real number $a$, let $S(a)$ be the area of the region bounded by $C$ and the two tangent lines to $C$ through $(a, -3)$. Find the minimum value of $S(a)$.
+    answer: "(1) $y = 6x - 9$, $y = -2x - 1$  (2) $S = \\frac{16}{3}$  (3) $2\\sqrt{3}$ (at $a = 0$)"
+    rubric:
+      - id: tangent_form
+        points: 1
+        criterion: "(1) Tangent at $(t, t^2)$: $y = 2tx - t^2$."
+      - id: tangent_points
+        points: 1
+        criterion: "(1) Passing through $A$: $t^2 - 2t - 3 = 0$, so $t = -1, 3$."
+      - id: tangent_lines
+        points: 1
+        criterion: "(1) $y = 6x - 9$ and $y = -2x - 1$."
+      - id: area_setup
+        points: 1
+        criterion: "(2) Split at the tangents' intersection $x = 1$ and set up $\\int_{-1}^{1} (x + 1)^2\\,dx + \\int_{1}^{3} (x - 3)^2\\,dx$, or equivalent."
+      - id: area_value
+        points: 2
+        criterion: "(2) $S = \\frac{8}{3} + \\frac{8}{3} = \\frac{16}{3}$."
+      - id: general_points
+        points: 1
+        criterion: "(3) Points of tangency satisfy $t^2 - 2at - 3 = 0$; with roots $\\alpha < \\beta$, $\\beta - \\alpha = 2\\sqrt{a^2 + 3}$."
+      - id: general_area
+        points: 2
+        criterion: "(3) $S(a) = \\frac{(\\beta - \\alpha)^3}{12} = \\frac{2}{3}(a^2 + 3)^{3/2}$, by integration or a justified formula."
+      - id: minimum
+        points: 1
+        criterion: "(3) Minimum $2\\sqrt{3}$, attained at $a = 0$."
+    alternatives:
+      - "(3) Using the formula $\\frac{(\\beta - \\alpha)^3}{12}$ without derivation earns `general_area` if the formula is stated correctly."
+    caps:
+      - "Each part: a correct final answer with no supporting reasoning earns only that part's final step."
+
+  - id: P2
+    topic: probability, recurrence
+    statement_ja: |
+      正三角形 $ABC$ の頂点上を動く点 $P$ があり、最初は頂点 $A$ にある。1回の試行で硬貨を1枚投げ、表が出れば時計回りに、裏が出れば反時計回りに、隣の頂点へ移る。$n$ 回の試行の後に $P$ が $A$ にある確率を $p_n$ とする。
+      (1) $p_1,\ p_2$ を求めよ。
+      (2) $p_{n+1}$ を $p_n$ を用いて表し、$p_n$ を求めよ。
+      (3) $n \geq 2$ とする。$n$ 回目の試行で初めて $P$ が $A$ に戻る確率 $q_n$ を求めよ。
+    statement_en: |
+      A point $P$ moves among the vertices of an equilateral triangle $ABC$, starting at $A$. In each trial a coin is tossed: on heads $P$ moves to the next vertex clockwise, on tails to the next vertex counterclockwise. Let $p_n$ be the probability that $P$ is at $A$ after $n$ trials.
+      (1) Find $p_1$ and $p_2$.
+      (2) Express $p_{n+1}$ in terms of $p_n$, and find $p_n$.
+      (3) Let $n \geq 2$. Find the probability $q_n$ that $P$ returns to $A$ for the first time at the $n$-th trial.
+    answer: "(1) $p_1 = 0$, $p_2 = \\frac{1}{2}$  (2) $p_{n+1} = \\frac{1}{2}(1 - p_n)$, $p_n = \\frac{1}{3} + \\frac{2}{3}\\left(-\\frac{1}{2}\\right)^n$  (3) $q_n = \\left(\\frac{1}{2}\\right)^{n-1}$"
+    rubric:
+      - id: p1
+        points: 1
+        criterion: "(1) $p_1 = 0$."
+      - id: p2
+        points: 1
+        criterion: "(1) $p_2 = \\frac{1}{2}$."
+      - id: recurrence
+        points: 2
+        criterion: "(2) $P$ is not at $A$ with probability $1 - p_n$ and then moves to $A$ with probability $\\frac{1}{2}$; from $A$ it always leaves. So $p_{n+1} = \\frac{1}{2}(1 - p_n)$."
+      - id: solve_recurrence
+        points: 1
+        criterion: "(2) Rewrite as $p_{n+1} - \\frac{1}{3} = -\\frac{1}{2}\\left(p_n - \\frac{1}{3}\\right)$."
+      - id: pn
+        points: 2
+        criterion: "(2) $p_n = \\frac{1}{3} + \\frac{2}{3}\\left(-\\frac{1}{2}\\right)^n$."
+      - id: first_return_reasoning
+        points: 1
+        criterion: "(3) After leaving $A$ at the first trial, $P$ must move between $B$ and $C$ (probability $\\frac{1}{2}$ each time) for trials 2 to $n-1$, then move to $A$ (probability $\\frac{1}{2}$)."
+      - id: qn
+        points: 2
+        criterion: "(3) $q_n = \\left(\\frac{1}{2}\\right)^{n-1}$."
+    alternatives:
+      - "(2) Writing $p_n$ with $p_1 = 0$ as the starting term, e.g. $p_n = \\frac{1}{3} - \\frac{1}{3}\\left(-\\frac{1}{2}\\right)^{n-1}$, is the same formula and earns `pn`."
+    caps:
+      - "Each part: a correct final answer with no supporting reasoning earns only that part's final step."
+
+  - id: P3
+    topic: integers, divisibility and an exponential equation
+    statement_ja: |
+      $n$ を整数とする。
+      (1) $n^2 + n + 1$ を $3$ で割った余りは $0$ または $1$ であることを示せ。
+      (2) $n^2 + n + 1$ は $9$ の倍数でないことを示せ。
+      (3) $n^2 + n + 1 = 3^k$ を満たす整数 $n$ と $0$ 以上の整数 $k$ の組 $(n, k)$ をすべて求めよ。
+    statement_en: |
+      Let $n$ be an integer.
+      (1) Show that the remainder when $n^2 + n + 1$ is divided by $3$ is $0$ or $1$.
+      (2) Show that $n^2 + n + 1$ is not a multiple of $9$.
+      (3) Find all pairs $(n, k)$ of an integer $n$ and a non-negative integer $k$ with $n^2 + n + 1 = 3^k$.
+    answer: "(3) $(n, k) = (0, 0), (-1, 0), (1, 1), (-2, 1)$"
+    rubric:
+      - id: cases
+        points: 1
+        criterion: "(1) Cover every integer: $n = 3m,\\ 3m + 1,\\ 3m + 2$ (or residues modulo 3)."
+      - id: case_values
+        points: 2
+        criterion: "(1) Remainders 1, 0, 1 respectively: $9m^2 + 3m + 1$, $9m^2 + 9m + 3$, $3(3m^2 + 5m + 2) + 1$."
+      - id: only_case
+        points: 1
+        criterion: "(2) A multiple of 9 is a multiple of 3, so by (1) only $n = 3m + 1$ needs checking."
+      - id: not_nine
+        points: 2
+        criterion: "(2) $n = 3m + 1$ gives $9(m^2 + m) + 3$, remainder 3 when divided by 9."
+      - id: k_bound
+        points: 1
+        criterion: "(3) For $k \\geq 2$, $3^k$ is a multiple of 9, impossible by (2); so $k = 0$ or $1$."
+      - id: k_zero
+        points: 1
+        criterion: "(3) $k = 0$: $n^2 + n = 0$, so $n = 0, -1$."
+      - id: k_one
+        points: 1
+        criterion: "(3) $k = 1$: $n^2 + n - 2 = 0$, so $n = 1, -2$."
+      - id: pairs
+        points: 1
+        criterion: "(3) All four pairs $(0, 0), (-1, 0), (1, 1), (-2, 1)$ and no others."
+    alternatives:
+      - "(1) $n^2 + n + 1 = (n - 1)(n + 2) + 3$ with $n + 2 \\equiv n - 1 \\pmod 3$, so it is congruent to a square, which is 0 or 1 mod 3: earns `cases` and `case_values` if every step is justified."
+    caps:
+      - "(1)(2): checking particular values (such as n = 1, 2, 3) is not a proof and earns 0 points for that part."
+      - "(3): listing pairs found by trial without ruling out $k \\geq 2$ earns at most `k_zero`, `k_one` and nothing for `pairs`."
+
+  - id: P4
+    topic: calculus, real roots of a cubic
+    statement_ja: |
+      $k$ を定数とし、$f(x) = x^3 - 3x^2 - 9x + k$ とする。
+      (1) $f(x)$ の極大値と極小値を $k$ を用いて表せ。
+      (2) 方程式 $f(x) = 0$ が異なる3つの実数解をもつような $k$ の値の範囲を求めよ。
+      (3) $k$ が (2) の範囲にあるとき、$f(x) = 0$ の3つの実数解を $\alpha < \beta < \gamma$ とする。$\alpha$ のとりうる値の範囲を求めよ。
+    statement_en: |
+      Let $k$ be a constant and $f(x) = x^3 - 3x^2 - 9x + k$.
+      (1) Express the local maximum and local minimum values of $f(x)$ in terms of $k$.
+      (2) Find all $k$ for which the equation $f(x) = 0$ has three distinct real solutions.
+      (3) For $k$ in the range from (2), let the three real solutions be $\alpha < \beta < \gamma$. Find the range of possible values of $\alpha$.
+    answer: "(1) local max $k + 5$ (at $x = -1$), local min $k - 27$ (at $x = 3$)  (2) $-5 < k < 27$  (3) $-3 < \\alpha < -1$"
+    rubric:
+      - id: derivative
+        points: 1
+        criterion: "(1) $f'(x) = 3(x + 1)(x - 3)$, with the increase/decrease table."
+      - id: extrema
+        points: 2
+        criterion: "(1) Local maximum $f(-1) = k + 5$, local minimum $f(3) = k - 27$."
+      - id: condition
+        points: 2
+        criterion: "(2) Three distinct real roots if and only if local maximum $> 0$ and local minimum $< 0$."
+      - id: k_range
+        points: 1
+        criterion: "(2) $-5 < k < 27$."
+      - id: alpha_location
+        points: 1
+        criterion: "(3) $\\alpha < -1$, from the shape of the graph (or $k = -x^3 + 3x^2 + 9x$ is decreasing for $x < -1$)."
+      - id: alpha_endpoints
+        points: 2
+        criterion: "(3) At $k = 27$, $f(x) = (x - 3)^2(x + 3)$, so the endpoint is $x = -3$; at $k = -5$ the root tends to $-1$."
+      - id: alpha_range
+        points: 1
+        criterion: "(3) $-3 < \\alpha < -1$, with endpoints excluded."
+    alternatives:
+      - "Separating the constant: $k = -x^3 + 3x^2 + 9x$ and counting intersections with $y = k$ earns the corresponding steps in (1) to (3)."
+    caps:
+      - "Each part: a correct final answer with no supporting reasoning earns only that part's final step."
