@@ -14,7 +14,8 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app import clock, config, worker
+from app import clock, config, samples, worker
+from app.grading import availability
 from app.database import get_db
 from app.dependencies import get_current_user, get_optional_user
 from app.models import JobStatus, User
@@ -28,6 +29,12 @@ from app.services import submissions as submission_service
 
 WEB_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=WEB_DIR / "templates")
+# Read by base.html, the grading page and the login page on every render.
+templates.env.globals.update(
+    grading_model=config.GEMINI_MODEL,
+    model_unavailable=availability.is_unavailable,
+    sample_available=samples.is_available,
+)
 
 router = APIRouter(include_in_schema=False)
 
@@ -35,6 +42,7 @@ ERROR_MESSAGES = {
     "limit_reached": "本日のAI採点の上限に達しました。また明日ご利用ください!",
     "guest_limit": "ゲストでの採点が混み合っています。少し時間をおくか、アカウント登録(無料)をするとご利用いただけます。",
     "problem_limit": "本日の問題登録の上限に達しました。また明日ご利用ください。",
+    "model_unavailable": "AI採点は現在停止中です。理由は画面上部のお知らせをご覧ください。",
 }
 
 
@@ -61,6 +69,16 @@ def login_page(request: Request, user: User | None = Depends(get_optional_user))
     if user is not None and not user.is_guest:
         return _redirect("/")
     return templates.TemplateResponse(request, "login.html")
+
+
+@router.get("/sample")
+def sample_page(request: Request, user: User | None = Depends(get_optional_user)):
+    """A real grading result anyone can open without an account. It stays useful when grading
+    is unavailable (daily cap reached, model shut down, model budget used up)."""
+    sample = samples.load()
+    if sample is None:
+        return _redirect("/")
+    return templates.TemplateResponse(request, "sample.html", {"sample": sample})
 
 
 @router.get("/logout")
@@ -278,6 +296,8 @@ async def submit_answer(
         return _redirect("/")
     if not problem.problem_image_path and not problem.problem_text:
         return _redirect(f"/solve/{problem_id}")
+    if availability.is_unavailable():
+        return _redirect("/?error=model_unavailable")
 
     try:
         upload = await storage.read_validated_upload(answer_image)

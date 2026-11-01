@@ -86,6 +86,8 @@ WORKER_CONCURRENCY = int(os.getenv("WORKER_CONCURRENCY", "4"))
 WORKER_POLL_INTERVAL_SECONDS = 1.0
 JOB_LEASE = timedelta(minutes=3)
 GRADING_MAX_ATTEMPTS = 3
+# How often the worker asks the API whether the grading model still exists (not billed).
+MODEL_CHECK_INTERVAL_SECONDS = 6 * 60 * 60
 
 CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME")
 CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY")

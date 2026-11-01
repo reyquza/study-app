@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app import worker
+from app import config, worker
 from app.database import get_db
 from app.dependencies import get_current_user
+from app.grading import availability
 from app.models import GradingJob, User
 from app.schemas import GradingJobResponse
 from app.services import grading_jobs
@@ -40,6 +41,11 @@ async def submit_answer(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Problem not found")
     if not problem.problem_image_path and not problem.problem_text:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Problem has no statement to grade against")
+    if availability.is_unavailable():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"The grading model {config.GEMINI_MODEL} is no longer available",
+        )
 
     try:
         upload = await storage.read_validated_upload(answer_image)

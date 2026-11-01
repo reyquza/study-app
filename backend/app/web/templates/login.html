@@ -28,6 +28,11 @@
 <body>
     <div class="login-container">
         <h2>NextLearn</h2>
+        <p class="guest-note" lang="en" style="margin: -12px 0 20px; line-height: 1.5;">
+            AI grading of handwritten math answers for Japanese university entrance exams.
+            The app is in Japanese, for its students.
+            {% if sample_available() %}<br><a href="/sample#english">See a graded sample with an English translation (no sign-up)</a>{% endif %}
+        </p>
 
         {% if request.state.user and request.state.user.is_guest %}
         <p class="guest-note" style="margin: 0 0 16px;">アカウントを作成すると、ゲストで登録した問題と採点結果がそのまま引き継がれます。</p>
@@ -54,6 +59,12 @@
         <div class="divider">または</div>
         <button id="guest" class="btn btn-guest" type="button">登録せずに試す（ゲスト）</button>
         <p class="guest-note">ゲストのデータは、ログアウトするかCookieを消すと見られなくなります。</p>
+        {% endif %}
+        {% if sample_available() %}
+        <p class="guest-note" style="margin-top: 16px;"><a href="/sample">AIの採点結果の見本を見る（登録不要）</a></p>
+        {% endif %}
+        {% if model_unavailable() %}
+        <p class="guest-note" style="color: #8d6e63;">AI採点は現在停止中です（採点に使っているAIモデル {{ grading_model }} の提供終了のため）。</p>
         {% endif %}
     </div>
 
