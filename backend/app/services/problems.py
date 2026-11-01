@@ -4,6 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import clock, config
+from app.database import lock_limits
 from app.models import Problem, StudyPlan, Tag, User
 
 
@@ -51,15 +52,23 @@ def list_recent_problems(db: Session, user_id: str, limit: int) -> list[Problem]
 
 def create_problem(
     db: Session,
-    user_id: str,
+    user: User,
     image_url: str | None,
     text: str | None,
     source: str | None,
     tag_names: list[str],
     scheduled_date: date | None,
 ) -> Problem:
+    """Raises ProblemLimitReached. The limit is checked again here, under the limits lock and
+    in the inserting transaction, because the upload before this takes seconds."""
+    lock_limits(db)
+    try:
+        check_problem_limit(db, user)
+    except ProblemLimitReached:
+        db.rollback()
+        raise
     problem = Problem(
-        user_id=user_id,
+        user_id=user.id,
         problem_image_path=image_url,
         problem_text=text or None,
         source=source.strip() if source and source.strip() else None,
