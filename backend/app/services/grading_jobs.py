@@ -44,6 +44,7 @@ class ClaimedJob:
     answer_image_path: str
     problem_text: str | None
     problem_image_path: str | None
+    language: str = "ja"
 
 
 def _utcnow() -> datetime:
@@ -96,6 +97,7 @@ async def enqueue_grading(
     user: User,
     problem: Problem,
     upload: storage.ValidatedUpload,
+    language: str = "ja",
 ) -> GradingJob:
     """Store the answer file and queue it for grading. Raises GradingLimitReached."""
     # Check before uploading, so a refused request costs no upload...
@@ -111,6 +113,7 @@ async def enqueue_grading(
         user_id=user.id,
         problem_id=problem.id,
         answer_image_path=answer_url,
+        language=language,
         status=JobStatus.QUEUED,
         run_after=now,
         created_at=now,
@@ -172,6 +175,7 @@ def claim_next_job(db: Session) -> ClaimedJob | None:
         attempt=job.attempts,
         answer_image_path=job.answer_image_path,
         problem_text=job.problem.problem_text,
+        language=job.language,
         problem_image_path=job.problem.problem_image_path,
     )
 

@@ -138,7 +138,12 @@ class GradingWorker:
         # The model SDK is blocking; a thread keeps the event loop (and the web app) responsive.
         return await run_in_threadpool(
             self._grader.grade,
-            GradingRequest(answer=answer, problem_text=claimed.problem_text, problem_file=problem_file),
+            GradingRequest(
+                answer=answer,
+                problem_text=claimed.problem_text,
+                problem_file=problem_file,
+                language=claimed.language,
+            ),
         )
 
     def _with_session(self, fn, *args):

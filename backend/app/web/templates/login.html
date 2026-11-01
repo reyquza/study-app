@@ -1,14 +1,16 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="{{ lang }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ログイン - NextLearn</title>
+    <title>{{ _("ログイン") }} - NextLearn</title>
     <style>
         *, *::before, *::after { box-sizing: border-box; }
         body { font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif; background-color: #f4f7f6; color: #333; display: flex; justify-content: center; align-items: center; min-height: 100dvh; margin: 0; padding: 16px; }
         .login-container { background: white; padding: 32px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
-        h2 { text-align: center; margin: 0 0 24px; }
+        h2 { text-align: center; margin: 0 0 8px; }
+        .lead { font-size: 13px; color: #666; text-align: center; line-height: 1.5; margin: 0 0 20px; }
+        .lang-switch { text-align: right; font-size: 13px; margin: -16px -12px 8px 0; }
         .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #eee; }
         .tab { flex: 1; padding: 10px; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; font-size: 15px; font-weight: bold; color: #888; cursor: pointer; }
         .tab[aria-selected="true"] { color: #1976D2; border-bottom-color: #1976D2; }
@@ -27,70 +29,76 @@
 </head>
 <body>
     <div class="login-container">
+        <div class="lang-switch">
+            {% if lang == 'en' %}<a href="/lang/ja" lang="ja">日本語</a>{% else %}<a href="/lang/en" lang="en">English</a>{% endif %}
+        </div>
         <h2>NextLearn</h2>
-        <p class="guest-note" lang="en" style="margin: -12px 0 20px; line-height: 1.5;">
-            AI grading of handwritten math answers for Japanese university entrance exams.
-            The app is in Japanese, for its students.
-            {% if sample_available() %}<br><a href="/sample#english">See a graded sample with an English translation (no sign-up)</a>{% endif %}
-        </p>
+        <p class="lead">{{ _("日本の大学入試に向けた、手書きの数学答案をAIが採点するアプリです。") }}</p>
 
         {% if request.state.user and request.state.user.is_guest %}
-        <p class="guest-note" style="margin: 0 0 16px;">アカウントを作成すると、ゲストで登録した問題と採点結果がそのまま引き継がれます。</p>
+        <p class="guest-note" style="margin: 0 0 16px;">{{ _("アカウントを作成すると、ゲストで登録した問題と採点結果がそのまま引き継がれます。") }}</p>
         {% endif %}
 
         <div class="tabs" role="tablist">
-            <button class="tab" role="tab" data-mode="login" aria-selected="true">ログイン</button>
-            <button class="tab" role="tab" data-mode="signup" aria-selected="false">新規登録</button>
+            <button class="tab" role="tab" data-mode="login" aria-selected="true">{{ _("ログイン") }}</button>
+            <button class="tab" role="tab" data-mode="signup" aria-selected="false">{{ _("新規登録") }}</button>
         </div>
 
         <form id="auth-form" novalidate>
-            <label for="email">メールアドレス</label>
+            <label for="email">{{ _("メールアドレス") }}</label>
             <input id="email" name="email" type="email" autocomplete="email" required>
 
-            <label for="password">パスワード</label>
+            <label for="password">{{ _("パスワード") }}</label>
             <input id="password" name="password" type="password" autocomplete="current-password" required>
-            <p id="password-hint" class="hint" hidden>8文字以上</p>
+            <p id="password-hint" class="hint" hidden>{{ _("8文字以上") }}</p>
 
             <p id="error" class="error" role="alert"></p>
-            <button id="submit" class="btn btn-primary" type="submit">ログイン</button>
+            <button id="submit" class="btn btn-primary" type="submit">{{ _("ログイン") }}</button>
         </form>
 
         {% if not request.state.user %}
-        <div class="divider">または</div>
-        <button id="guest" class="btn btn-guest" type="button">登録せずに試す（ゲスト）</button>
-        <p class="guest-note">ゲストのデータは、ログアウトするかCookieを消すと見られなくなります。</p>
+        <div class="divider">{{ _("または") }}</div>
+        <button id="guest" class="btn btn-guest" type="button">{{ _("登録せずに試す（ゲスト）") }}</button>
+        <p class="guest-note">{{ _("ゲストのデータは、ログアウトするかCookieを消すと見られなくなります。") }}</p>
         {% endif %}
         {% if sample_available() %}
-        <p class="guest-note" style="margin-top: 16px;"><a href="/sample">AIの採点結果の見本を見る（登録不要）</a></p>
+        <p class="guest-note" style="margin-top: 16px;"><a href="/sample{% if lang == 'en' %}#english{% endif %}">{{ _("AIの採点結果の見本を見る（登録不要）") }}</a></p>
         {% endif %}
         {% if model_unavailable() %}
-        <p class="guest-note" style="color: #8d6e63;">AI採点は現在停止中です（採点に使っているAIモデル {{ grading_model }} の提供終了のため）。</p>
+        <p class="guest-note" style="color: #8d6e63;">{{ _("AI採点は現在停止中です（採点に使っているAIモデル {model} の提供終了のため）。", model=grading_model) }}</p>
         {% endif %}
     </div>
 
     <script>
     (() => {
+        const T = {{ {
+            "401": _("メールアドレスかパスワードが違います。"),
+            "409": _("このメールアドレスはすでに登録されています。ログインしてください。"),
+            "429": _("試行回数が多すぎます。しばらく時間をおいてからお試しください。"),
+            "422_signup": _("メールアドレスの形式と、パスワードが8文字以上かを確認してください。"),
+            "422_login": _("メールアドレスの形式を確認してください。"),
+            "error": _("エラーが発生しました。もう一度お試しください。"),
+            "offline": _("サーバーに接続できませんでした。"),
+            "login": _("ログイン"),
+            "signup": _("登録してはじめる"),
+        } | tojson }};
         const form = document.getElementById("auth-form");
         const password = document.getElementById("password");
         const submit = document.getElementById("submit");
         const error = document.getElementById("error");
         let mode = new URLSearchParams(location.search).get("mode") === "signup" ? "signup" : "login";
 
-        const MESSAGES = {
-            401: "メールアドレスかパスワードが違います。",
-            409: "このメールアドレスはすでに登録されています。ログインしてください。",
-            429: "試行回数が多すぎます。しばらく時間をおいてからお試しください。",
-            422: mode => mode === "signup"
-                ? "メールアドレスの形式と、パスワードが8文字以上かを確認してください。"
-                : "メールアドレスの形式を確認してください。",
-        };
+        function message(status) {
+            if (status === 422) return T[`422_${mode}`];
+            return T[String(status)] || T.error;
+        }
 
         function setMode(next) {
             mode = next;
             document.querySelectorAll(".tab").forEach(tab => {
                 tab.setAttribute("aria-selected", String(tab.dataset.mode === mode));
             });
-            submit.textContent = mode === "signup" ? "登録してはじめる" : "ログイン";
+            submit.textContent = mode === "signup" ? T.signup : T.login;
             password.autocomplete = mode === "signup" ? "new-password" : "current-password";
             document.getElementById("password-hint").hidden = mode !== "signup";
             error.textContent = "";
@@ -109,10 +117,9 @@
                     location.replace("/");
                     return;
                 }
-                const message = MESSAGES[response.status];
-                error.textContent = typeof message === "function" ? message(mode) : (message || "エラーが発生しました。もう一度お試しください。");
+                error.textContent = message(response.status);
             } catch {
-                error.textContent = "サーバーに接続できませんでした。";
+                error.textContent = T.offline;
             }
             document.querySelectorAll(".btn").forEach(btn => btn.disabled = false);
         }

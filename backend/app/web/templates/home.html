@@ -6,45 +6,45 @@
 {% block content %}
     {% if error_message %}
         <div style="background-color: #ffebee; color: #c62828; padding: 15px; margin-bottom: 20px; border-radius: 5px; border: 1px solid #ef9a9a; text-align: center; font-weight: bold;">
-            {{ error_message }}
+            {{ _(error_message) }}
             {% if sample_available() %}
-            <div style="margin-top: 8px; font-weight: normal;"><a href="/sample">代わりに、実際の採点結果の見本を見る</a></div>
+            <div style="margin-top: 8px; font-weight: normal;"><a href="/sample{% if lang == 'en' %}#english{% endif %}">{{ _("代わりに、実際の採点結果の見本を見る") }}</a></div>
             {% endif %}
         </div>
     {% endif %}
     <header>
-        <h3 style="text-align: center;">何やってるんですか　勉強してください！</h3>
+        <h3 style="text-align: center;">{{ _("何やってるんですか　勉強してください！") }}</h3>
         {% if sample_available() %}
-        <p style="text-align: center; margin: 0;"><a href="/sample">AIの採点結果の見本を見る</a></p>
+        <p style="text-align: center; margin: 0;"><a href="/sample{% if lang == 'en' %}#english{% endif %}">{{ _("AIの採点結果の見本を見る") }}</a></p>
         {% endif %}
     </header>
-    
+
     <main>
         <div class="today-section">
-            <p>今日の日付： <strong>{{ today.strftime("%Y-%m-%d") }}</strong></p>
+            <p>{{ _("今日の日付：") }} <strong>{{ today.strftime("%Y-%m-%d") }}</strong></p>
         </div>
 
         <div class="calendar-section">
-            <h4>未完了のToDo</h4>
-            <div>3日後までの未完了のToDoが表示されます</div>
+            <h4>{{ _("未完了のToDo") }}</h4>
+            <div>{{ _("3日後までの未完了のToDoが表示されます") }}</div>
             {% if calendar_data %}
                 <div class="schedule-list">
                     {% for plan_date, daily_plans in calendar_data.items() %}
                         <div class="day-block">
-                            <h5 class="date-header">{{ plan_date }}のToDo</h5>
+                            <h5 class="date-header">{{ _("{date}のToDo", date=plan_date) }}</h5>
                             <ul>
                                 {% for plan in daily_plans %}
                                     {% if plan.is_completed == False %}
                                         <li>
-                                        <span style="font-size: 0.9em; color: #666;">問題ID: {{ plan.problem_id }}</span>
+                                        <span style="font-size: 0.9em; color: #666;">{{ _("問題ID:") }} {{ plan.problem_id }}</span>
                                         <a href="/solve/{{ plan.problem_id }}" style="color: inherit; text-decoration: none; font-weight: bold; display: block; margin: 5px 0;">
                                             {{ plan.problem.source }}
                                         </a>
-                                        <span style="color: #d32f2f; font-size: 0.9em;">[未完了]</span>
+                                        <span style="color: #d32f2f; font-size: 0.9em;">{{ _("[未完了]") }}</span>
                                         </li>
-                                        <form action="/delete-task/{{ plan.id }}" method="post" onsubmit="return confirm('本当にこのタスクを削除しますか？');">
+                                        <form action="/delete-task/{{ plan.id }}" method="post" onsubmit='return confirm({{ _("本当にこのタスクを削除しますか？") | tojson }});'>
                                             <button type="submit" style="display: inline-block; background-color: #56bc17; color: white; text-decoration: none; padding: 8px 15px; border-radius: 4px; font-size: 0.9em; font-weight: bold; margin-bottom: 10px;">
-                                                タスクを削除
+                                                {{ _("タスクを削除") }}
                                             </button>
                                         </form>
                                     {% endif %}
@@ -54,13 +54,13 @@
                     {% endfor %}
                 </div>
             {% else %}
-                <p>現在、未完了のTodoはありません。</p>
+                <p>{{ _("現在、未完了のTodoはありません。") }}</p>
             {% endif %}
         </div>
         <br>
         <div style="display: flex; flex-direction: column; align-items: center; gap: 15px; margin-top: 30px; margin-bottom: 20px;">
-            <a href="/schedule" class="rounded-btn">予定表を確認・編集する</a>
-            <a href="/register-problem" class="rounded-btn">問題を登録する</a>
+            <a href="/schedule" class="rounded-btn">{{ _("予定表を確認・編集する") }}</a>
+            <a href="/register-problem" class="rounded-btn">{{ _("問題を登録する") }}</a>
         </div>
     </main>
 {% endblock content %}

@@ -1,5 +1,5 @@
 <div class="day-block" style="margin-bottom: 20px;">
-    <h4 style="margin-top: 0; color: #4CAF50;">問題</h4>
+    <h4 style="margin-top: 0; color: #4CAF50;">{{ _("問題") }}</h4>
     
     {% if problem.problem_image_path %}
         {% if problem.problem_image_path.endswith('.pdf') %}
@@ -10,7 +10,7 @@
         {% else %}
             <img 
                 src="{{ problem.problem_image_path }}" 
-                alt="問題画像"
+                alt="{{ _('問題画像') }}"
                 style="max-width: 100%; max-height: 400px; border-radius: 4px; display: block; margin: 0 auto; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
         {% endif %}
     {% endif %}
