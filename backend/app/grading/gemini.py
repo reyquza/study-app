@@ -34,11 +34,28 @@ class GeminiGrader:
                 config={
                     "response_mime_type": "application/json",
                     "response_json_schema": GradingResult.model_json_schema(),
+                    "max_output_tokens": config.GRADING_MAX_OUTPUT_TOKENS,
                 },
             )
             return GradingResult.model_validate_json(response.text or "")
         except (errors.APIError, httpx.HTTPError, ValidationError) as exc:
-            raise GradingFailed(f"{self.model_name}: {exc}") from exc
+            raise as_grading_failure(self.model_name, exc) from exc
+
+
+# Rejected before generating anything (rate limit, overload), so a retry costs nothing extra.
+_UNBILLED_STATUS_CODES = {429, 500, 503}
+
+
+def as_grading_failure(model_name: str, exc: errors.APIError | httpx.HTTPError | ValidationError) -> GradingFailed:
+    """Map a model-call error to GradingFailed, marking whether a retry is worth paying for."""
+    if isinstance(exc, errors.APIError):
+        retryable = exc.code in _UNBILLED_STATUS_CODES
+    elif isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout)):
+        retryable = True  # the request never reached the model
+    else:
+        # A read timeout may still be generating (and billed); a malformed or truncated reply was billed.
+        retryable = False
+    return GradingFailed(f"{model_name}: {exc}", retryable=retryable)
 
 
 def _to_part(file: FilePart) -> types.Part:

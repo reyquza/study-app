@@ -1,9 +1,27 @@
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Problem, StudyPlan, Tag
+from app import clock, config
+from app.models import Problem, StudyPlan, Tag, User
+
+
+class ProblemLimitReached(Exception):
+    pass
+
+
+def check_problem_limit(db: Session, user: User) -> None:
+    """Raise ProblemLimitReached if the user may not register another problem today.
+    Guests also share one daily cap, since anyone can create guests."""
+    day_start = clock.local_day_start_utc(clock.local_today())
+    today = select(func.count()).select_from(Problem).where(Problem.created_at >= day_start)
+    if (db.scalar(today.where(Problem.user_id == user.id)) or 0) >= config.DAILY_PROBLEM_LIMIT:
+        raise ProblemLimitReached()
+    if user.is_guest:
+        guests_today = today.join(User, User.id == Problem.user_id).where(User.is_guest.is_(True))
+        if (db.scalar(guests_today) or 0) >= config.GUEST_DAILY_PROBLEM_LIMIT:
+            raise ProblemLimitReached()
 
 
 def parse_tag_names(raw: str | None) -> list[str]:

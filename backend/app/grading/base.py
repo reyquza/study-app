@@ -18,7 +18,9 @@ class GradingResult(BaseModel):
     score: int = Field(ge=0, le=100, description="100点満点での採点結果(部分点考慮)")
     ai_feedback: str = Field(
         description="生徒への具体的なアドバイス。どこで間違えたか、どう考えればよかったのかを解説してください。数式を書く際は必ずLaTeX形式とし、インライン数式は $ で、ブロック数式は $$ で囲んでください。",
-        max_length=500,
+        # The model still sees maxLength in the schema, but a longer reply is accepted: rejecting
+        # it would throw away a billed answer and pay for a retry.
+        json_schema_extra={"maxLength": 500},
     )
     explanation: str = Field(
         description="問題の模範解答と、本番での解法戦略(部分点の狙い方など)の解説。数式を書く際は必ずLaTeX形式とし、インライン数式は $ で、ブロック数式は $$ で囲んでください。",
@@ -26,7 +28,12 @@ class GradingResult(BaseModel):
 
 
 class GradingFailed(Exception):
-    pass
+    """The model call failed. `retryable` is False when the failed call was probably billed
+    (a timeout, or a reply that was cut off or malformed), so retrying would pay again."""
+
+    def __init__(self, message: str, retryable: bool = True):
+        super().__init__(message)
+        self.retryable = retryable
 
 
 class Grader(Protocol):

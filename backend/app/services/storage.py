@@ -1,5 +1,6 @@
 """Upload validation and file storage (Cloudinary)."""
 
+import io
 import os
 from dataclasses import dataclass
 from urllib.parse import urlparse
@@ -9,6 +10,7 @@ import cloudinary.uploader
 import requests
 from fastapi import UploadFile, status
 from fastapi.concurrency import run_in_threadpool
+from pypdf import PdfReader
 
 from app import config
 
@@ -85,7 +87,22 @@ async def read_validated_upload(upload: UploadFile) -> ValidatedUpload:
     else:
         mime_type = "image/jpeg"
 
+    if mime_type == "application/pdf":
+        pages = await run_in_threadpool(_count_pdf_pages, data)
+        if pages is None:
+            raise UploadRejected("PDFを読み込めませんでした。画像で送るか、別のPDFをお試しください。")
+        if pages > config.MAX_PDF_PAGES:
+            raise UploadRejected(f"PDFは{config.MAX_PDF_PAGES}ページまでです。")
+
     return ValidatedUpload(file=FilePart(data=data, mime_type=mime_type), extension=extension)
+
+
+def _count_pdf_pages(data: bytes) -> int | None:
+    """Page count, or None if the file is not a readable PDF."""
+    try:
+        return len(PdfReader(io.BytesIO(data)).pages)
+    except Exception:  # pypdf raises many types on broken or hostile files
+        return None
 
 
 async def store_upload(upload: ValidatedUpload) -> str:

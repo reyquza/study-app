@@ -14,6 +14,7 @@ from app.grading.base import GradingFailed, GradingRequest, GradingResult
 from app.main import app
 from app.models import User
 from app.security import create_session_token
+from app.services import auth as auth_service
 from app.services import storage
 from app.worker import GradingWorker
 
@@ -24,14 +25,23 @@ class FakeGrader:
     score: int = 70
     # The next `failures` calls raise GradingFailed, like a model outage.
     failures: int = 0
+    retryable: bool = True
     requests: list[GradingRequest] = field(default_factory=list)
 
     def grade(self, request: GradingRequest) -> GradingResult:
         self.requests.append(request)
         if self.failures > 0:
             self.failures -= 1
-            raise GradingFailed("fake outage")
+            raise GradingFailed("fake outage", retryable=self.retryable)
         return GradingResult(score=self.score, ai_feedback="feedback", explanation="model answer")
+
+
+@pytest.fixture(autouse=True)
+def reset_account_limits():
+    """The account limiters keep state in memory; start every test from zero."""
+    auth_service.reset_limits()
+    yield
+    auth_service.reset_limits()
 
 
 @pytest.fixture

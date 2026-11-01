@@ -31,6 +31,17 @@ templates = Jinja2Templates(directory=WEB_DIR / "templates")
 
 router = APIRouter(include_in_schema=False)
 
+ERROR_MESSAGES = {
+    "limit_reached": "本日のAI採点の上限に達しました。また明日ご利用ください!",
+    "guest_limit": "ゲストでの採点が混み合っています。少し時間をおくか、アカウント登録(無料)をするとご利用いただけます。",
+    "problem_limit": "本日の問題登録の上限に達しました。また明日ご利用ください。",
+}
+
+
+def _too_long(value: str | None, limit: int, label: str) -> None:
+    if value is not None and len(value) > limit:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{label}は{limit}文字までです。")
+
 
 def _redirect(url: str) -> RedirectResponse:
     # 303 makes the browser follow with a GET, which is what we want after a form POST.
@@ -73,7 +84,7 @@ def home(
         {
             "today": today,
             "calendar_data": plan_service.upcoming_incomplete_plans(db, user.id, today),
-            "error_message": "本日のAI採点の上限に達しました。また明日ご利用ください!" if error == "limit_reached" else None,
+            "error_message": ERROR_MESSAGES.get(error),
         },
     )
 
@@ -163,7 +174,9 @@ def delete_task(
     # kept so a forged Referer cannot redirect to another site.
     referer = urlsplit(request.headers.get("referer", "/"))
     back_to = referer.path + (f"?{referer.query}" if referer.query else "")
-    return _redirect(back_to if back_to.startswith("/") and not back_to.startswith("//") else "/")
+    # Browsers read "/\host" like "//host", so both forms are refused.
+    is_local = back_to.startswith("/") and not back_to.startswith(("//", "/\\"))
+    return _redirect(back_to if is_local else "/")
 
 
 @router.get("/confirm-problem/{problem_id}")
@@ -205,6 +218,20 @@ async def register_problem(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    # The text goes into every grading prompt, which is billed per token.
+    _too_long(text, config.MAX_PROBLEM_TEXT_CHARS, "問題文")
+    _too_long(source, config.MAX_SOURCE_CHARS, "出典")
+    tag_names = problem_service.parse_tag_names(tags)
+    if len(tag_names) > config.MAX_TAGS or any(len(name) > config.MAX_TAG_CHARS for name in tag_names):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"タグは{config.MAX_TAGS}個まで、1つ{config.MAX_TAG_CHARS}文字までです。",
+        )
+    try:
+        problem_service.check_problem_limit(db, user)
+    except problem_service.ProblemLimitReached:
+        return _redirect("/?error=problem_limit")
+
     try:
         upload = await storage.read_validated_upload(image)
     except storage.UploadRejected as exc:
@@ -216,7 +243,7 @@ async def register_problem(
         image_url=await storage.store_upload(upload),
         text=text,
         source=source,
-        tag_names=problem_service.parse_tag_names(tags),
+        tag_names=tag_names,
         scheduled_date=_parse_day(scheduled_date) if scheduled_date else None,
     )
     return _redirect("/")
@@ -251,11 +278,11 @@ async def submit_answer(
 
     try:
         upload = await storage.read_validated_upload(answer_image)
-        job = await grading_jobs.enqueue_grading(db, user.id, problem, upload)
+        job = await grading_jobs.enqueue_grading(db, user, problem, upload)
     except storage.UploadRejected as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.message)
-    except grading_jobs.DailyLimitReached:
-        return _redirect("/?error=limit_reached")
+    except grading_jobs.GradingLimitReached as exc:
+        return _redirect("/?error=guest_limit" if exc.scope == "guest" else "/?error=limit_reached")
 
     worker.notify_new_job()
     return _redirect(f"/grading/{job.id}")
@@ -304,5 +331,7 @@ def update_memo(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    _too_long(mistake, config.MAX_MEMO_CHARS, "ミス")
+    _too_long(user_memo, config.MAX_MEMO_CHARS, "メモ")
     submission_service.save_reflection(db, user.id, submission_id, mistake, user_memo)
     return _redirect("/")

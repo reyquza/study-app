@@ -1,5 +1,6 @@
 """Password hashing (Argon2) and the signed session token kept in an httpOnly cookie."""
 
+import threading
 from datetime import datetime, timezone
 
 import jwt
@@ -8,22 +9,34 @@ from jwt.exceptions import InvalidTokenError
 from pwdlib import PasswordHash
 from pwdlib.exceptions import UnknownHashError
 
-from app.config import IS_PRODUCTION, JWT_ALGORITHM, JWT_SECRET_KEY, SESSION_COOKIE_NAME, SESSION_LIFETIME
+from app.config import (
+    IS_PRODUCTION,
+    JWT_ALGORITHM,
+    JWT_SECRET_KEY,
+    MAX_CONCURRENT_PASSWORD_HASHES,
+    SESSION_COOKIE_NAME,
+    SESSION_LIFETIME,
+)
 
 
 password_hasher = PasswordHash.recommended()
+# Each Argon2 hash takes 64 MiB. Sync routes run in a thread pool of up to 40 threads, so
+# without a bound a burst of logins could take gigabytes on a 512 MB server.
+_hash_slots = threading.BoundedSemaphore(MAX_CONCURRENT_PASSWORD_HASHES)
 # Verified against when the email is unknown, so a failed login takes the same time
 # whether or not the account exists.
 DUMMY_PASSWORD_HASH = password_hasher.hash("dummy-password-for-timing-safety")
 
 
 def hash_password(password: str) -> str:
-    return password_hasher.hash(password)
+    with _hash_slots:
+        return password_hasher.hash(password)
 
 
 def verify_password(password: str, hashed_password: str) -> bool:
     try:
-        return password_hasher.verify(password, hashed_password)
+        with _hash_slots:
+            return password_hasher.verify(password, hashed_password)
     except UnknownHashError:
         return False
 
