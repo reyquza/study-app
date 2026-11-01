@@ -48,7 +48,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
 DAILY_GRADING_LIMIT = int(os.getenv("DAILY_GRADING_LIMIT", "5"))
 # Cap across all users, so open sign-up cannot run up the model bill.
-GLOBAL_DAILY_GRADING_LIMIT = int(os.getenv("GLOBAL_DAILY_GRADING_LIMIT", "300"))
+GLOBAL_DAILY_GRADING_LIMIT = int(os.getenv("GLOBAL_DAILY_GRADING_LIMIT", "20"))
 # Caps shared by all guest users together: anyone can create guests, so a per-user limit
 # alone does not bound what guests can spend.
 GUEST_GRADING_LIMITS = (
@@ -72,9 +72,8 @@ MAX_TAGS = 10
 MAX_TAG_CHARS = 50
 MAX_MEMO_CHARS = 2000
 
-# Abuse limits on account endpoints. In memory, which is exact while the app runs as one
-# process (the deployment does); with several processes each would allow this much.
-LOGIN_FAILURE_LIMIT = (10, timedelta(minutes=15))  # per email
+# Abuse limits on account endpoints, kept in the database so restarts do not reset them.
+LOGIN_FAILURE_LIMIT = (10, timedelta(minutes=15))  # consecutive failures per account, lock duration
 NEW_GUEST_LIMIT = (30, timedelta(minutes=1))  # across everyone
 NEW_ACCOUNT_LIMIT = (30, timedelta(minutes=1))  # across everyone
 # Argon2 uses 64 MiB per hash; bound concurrent hashes so a burst of logins cannot exhaust memory.

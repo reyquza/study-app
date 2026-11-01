@@ -1,6 +1,6 @@
 from collections.abc import Generator
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import DATABASE_URL
@@ -32,6 +32,17 @@ SessionLocal = sessionmaker(
     autoflush=False,
     expire_on_commit=False,
 )
+
+
+# Any constant works; it only has to be the same for every process.
+_LIMITS_LOCK_KEY = 4_812_001
+
+
+def lock_limits(db: Session) -> None:
+    """Serialize limit checks until this transaction ends, so concurrent requests cannot all
+    pass the same check. SQLite already allows only one writer at a time."""
+    if db.get_bind().dialect.name == "postgresql":
+        db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": _LIMITS_LOCK_KEY})
 
 
 def get_db() -> Generator[Session, None, None]:

@@ -8,10 +8,11 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import and_, func, or_, select, text, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app import clock, config
+from app.database import lock_limits
 from app.grading.base import GradingResult
 from app.models import GradingJob, JobStatus, Problem, Submission, User
 from app.services import storage
@@ -90,17 +91,6 @@ def _check_limits(db: Session, user: User) -> None:
         raise GradingLimitReached("global")
 
 
-def _lock_limits(db: Session) -> None:
-    """Serialize limit checks until this transaction ends, so concurrent submissions cannot
-    all pass the same check. SQLite already allows only one writer at a time."""
-    if db.get_bind().dialect.name == "postgresql":
-        db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": _LIMITS_LOCK_KEY})
-
-
-# Any constant works; it only has to be the same for every process.
-_LIMITS_LOCK_KEY = 4_812_001
-
-
 async def enqueue_grading(
     db: Session,
     user: User,
@@ -114,7 +104,7 @@ async def enqueue_grading(
 
     # ...and again under a lock, in the transaction that inserts the job, because the upload
     # takes seconds and other submissions may have been queued meanwhile.
-    _lock_limits(db)
+    lock_limits(db)
     _check_limits(db, user)
     now = _utcnow()
     job = GradingJob(

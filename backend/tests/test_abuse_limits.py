@@ -15,8 +15,6 @@ from app import config
 from app.grading.base import GradingRequest, GradingResult
 from app.grading.gemini import GeminiGrader, as_grading_failure
 from app.models import GradingJob, JobStatus, Problem, User
-from app.ratelimit import SlidingWindowLimiter
-from app.services import auth as auth_service
 from app.services.storage import FilePart
 from tests.conftest import login_as
 from tests.factories import ANSWER_FILE, make_problem, make_submission
@@ -42,22 +40,47 @@ def _problem_count(db) -> int:
 
 # --- accounts ---------------------------------------------------------------------------
 
-def test_login_locks_after_repeated_failures_even_with_the_right_password(anonymous_client, monkeypatch):
-    monkeypatch.setattr(auth_service, "login_failures", SlidingWindowLimiter((3, timedelta(minutes=15))))
+def _login(client, email, password):
+    return client.post("/api/auth/login", json={"email": email, "password": password})
+
+
+def test_login_locks_after_repeated_failures_even_with_the_right_password(anonymous_client, monkeypatch, db):
+    monkeypatch.setattr(config, "LOGIN_FAILURE_LIMIT", (3, timedelta(minutes=15)))
     anonymous_client.post("/api/auth/signup", json={"email": "carol@example.com", "password": "correct-horse"})
+    anonymous_client.post("/api/auth/signup", json={"email": "dave@example.com", "password": "dave-password"})
     anonymous_client.cookies.clear()
 
-    def login(email, password):
-        return anonymous_client.post("/api/auth/login", json={"email": email, "password": password})
+    codes = [_login(anonymous_client, "carol@example.com", "wrong-password").status_code for _ in range(3)]
 
-    assert [login("carol@example.com", "wrong-password").status_code for _ in range(3)] == [401, 401, 401]
-    assert login("Carol@example.com", "correct-horse").status_code == 429
+    assert codes == [401, 401, 401]
+    assert _login(anonymous_client, "Carol@example.com", "correct-horse").status_code == 429
+    # The lock is stored on the account, so a restart does not lift it.
+    db.expire_all()
+    assert db.scalar(select(User).where(User.email == "carol@example.com")).locked_until is not None
     # Other accounts are not affected.
-    assert login("dave@example.com", "whatever-pass").status_code == 401
+    assert _login(anonymous_client, "dave@example.com", "dave-password").status_code == 200
+
+
+def test_lock_expires_and_a_successful_login_resets_the_count(anonymous_client, monkeypatch, db):
+    monkeypatch.setattr(config, "LOGIN_FAILURE_LIMIT", (2, timedelta(minutes=15)))
+    anonymous_client.post("/api/auth/signup", json={"email": "carol@example.com", "password": "correct-horse"})
+    anonymous_client.cookies.clear()
+    _login(anonymous_client, "carol@example.com", "wrong-password")
+    _login(anonymous_client, "carol@example.com", "wrong-password")
+    assert _login(anonymous_client, "carol@example.com", "correct-horse").status_code == 429
+
+    carol = db.scalar(select(User).where(User.email == "carol@example.com"))
+    carol.locked_until = carol.locked_until - timedelta(minutes=16)
+    db.commit()
+
+    assert _login(anonymous_client, "carol@example.com", "correct-horse").status_code == 200
+    _login(anonymous_client, "carol@example.com", "wrong-password")
+    db.expire_all()
+    assert (carol.failed_logins, carol.locked_until) == (1, None)
 
 
 def test_guest_creation_is_rate_limited(anonymous_client, monkeypatch, db):
-    monkeypatch.setattr(auth_service, "new_guests", SlidingWindowLimiter((2, timedelta(minutes=1))))
+    monkeypatch.setattr(config, "NEW_GUEST_LIMIT", (2, timedelta(minutes=1)))
 
     codes = [anonymous_client.post("/api/auth/guest").status_code for _ in range(3)]
 
@@ -65,25 +88,25 @@ def test_guest_creation_is_rate_limited(anonymous_client, monkeypatch, db):
     assert db.scalar(select(func.count()).select_from(User)) == 2
 
 
+def test_guest_creation_counts_only_recent_guests(anonymous_client, monkeypatch, db):
+    monkeypatch.setattr(config, "NEW_GUEST_LIMIT", (1, timedelta(minutes=1)))
+    old = User(is_guest=True)
+    db.add(old)
+    db.commit()
+    old.created_at = old.created_at - timedelta(minutes=2)
+    db.commit()
+
+    assert anonymous_client.post("/api/auth/guest").status_code == 201
+
+
 def test_sign_up_is_rate_limited(anonymous_client, monkeypatch):
-    monkeypatch.setattr(auth_service, "new_accounts", SlidingWindowLimiter((1, timedelta(minutes=1))))
+    monkeypatch.setattr(config, "NEW_ACCOUNT_LIMIT", (1, timedelta(minutes=1)))
 
     first = anonymous_client.post("/api/auth/signup", json={"email": "a@example.com", "password": "password-1"})
     anonymous_client.cookies.clear()
     second = anonymous_client.post("/api/auth/signup", json={"email": "b@example.com", "password": "password-2"})
 
     assert (first.status_code, second.status_code) == (201, 429)
-
-
-def test_sliding_window_forgets_old_events(monkeypatch):
-    now = [1000.0]
-    monkeypatch.setattr("app.ratelimit.time.monotonic", lambda: now[0])
-    limiter = SlidingWindowLimiter((2, timedelta(seconds=60)))
-
-    assert limiter.try_hit() and limiter.try_hit()
-    assert not limiter.try_hit()
-    now[0] += 61
-    assert limiter.try_hit()
 
 
 # --- uploads and text -------------------------------------------------------------------

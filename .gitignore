@@ -22,3 +22,6 @@ backend/app/web/static/images/
 
 # Personal notes
 teacher/
+
+# Evaluation data: participants' answers and labels stay out of git
+eval/data/

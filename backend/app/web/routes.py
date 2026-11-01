@@ -237,15 +237,18 @@ async def register_problem(
     except storage.UploadRejected as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.message)
 
-    problem_service.create_problem(
-        db,
-        user_id=user.id,
-        image_url=await storage.store_upload(upload),
-        text=text,
-        source=source,
-        tag_names=tag_names,
-        scheduled_date=_parse_day(scheduled_date) if scheduled_date else None,
-    )
+    try:
+        problem_service.create_problem(
+            db,
+            user=user,
+            image_url=await storage.store_upload(upload),
+            text=text,
+            source=source,
+            tag_names=tag_names,
+            scheduled_date=_parse_day(scheduled_date) if scheduled_date else None,
+        )
+    except problem_service.ProblemLimitReached:
+        return _redirect("/?error=problem_limit")
     return _redirect("/")
 
 
