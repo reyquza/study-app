@@ -124,6 +124,13 @@ class GradingJob(Base):
     __tablename__ = "grading_jobs"
     __table_args__ = (Index("ix_grading_jobs_status_run_after", "status", "run_after"),)
 
+    @property
+    def failure_reason(self) -> str | None:
+        """"model_unavailable" when the model was shut down, "error" for other failures."""
+        if self.status != JobStatus.FAILED:
+            return None
+        return "model_unavailable" if (self.last_error or "").startswith("ModelUnavailable") else "error"
+
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     problem_id: Mapped[int] = mapped_column(ForeignKey("problems.id"))

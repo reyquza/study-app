@@ -49,6 +49,14 @@
             {% endif %}
         </div>
     </nav>
+    {% if model_unavailable() %}
+    <div class="service-notice" role="status" style="background: #fff8e1; border-bottom: 1px solid #ffe082; color: #5d4037; padding: 12px 16px; text-align: center; line-height: 1.6;">
+        <strong>AI採点は現在停止中です。</strong>
+        採点に使っているAIモデル（{{ grading_model }}）の提供がGoogleによって終了したため、新しい答案を受け付けていません。
+        新しいモデルへの移行と、採点精度の再検証が済みしだい再開します。
+        {% if sample_available() %}<a href="/sample">実際の採点結果の見本を見る</a>{% endif %}
+    </div>
+    {% endif %}
     
 
     <div class="container">

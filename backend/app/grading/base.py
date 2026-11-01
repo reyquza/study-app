@@ -36,6 +36,14 @@ class GradingFailed(Exception):
         self.retryable = retryable
 
 
+class ModelUnavailable(GradingFailed):
+    """The model API says the configured model does not exist (e.g. a preview model was shut
+    down). Not retryable, and not billed."""
+
+    def __init__(self, message: str):
+        super().__init__(message, retryable=False)
+
+
 class Grader(Protocol):
     """Anything that can grade a handwritten answer. Implementations are blocking;
     callers run them in a worker thread."""

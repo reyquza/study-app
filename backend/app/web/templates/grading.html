@@ -18,20 +18,27 @@
     </style>
 
     <div id="grading" class="day-block grading-card{% if job.status.value == 'failed' %} grading-failed{% endif %}"
-         data-job-url="/api/grading-jobs/{{ job.id }}">
+         data-job-url="/api/grading-jobs/{{ job.id }}" data-model="{{ grading_model }}">
         <div class="grading-spinner" aria-hidden="true"></div>
         <h3 id="grading-title" aria-live="polite">
-            {% if job.status.value == 'failed' %}採点できませんでした{% else %}AIが採点しています{% endif %}
+            {% if job.failure_reason == 'model_unavailable' %}AIモデルが使えなくなりました
+            {% elif job.status.value == 'failed' %}採点できませんでした
+            {% else %}AIが採点しています{% endif %}
         </h3>
         <p id="grading-detail" class="grading-note">
-            {% if job.status.value == 'failed' %}
+            {% if job.failure_reason == 'model_unavailable' %}
+                採点に使っているAIモデル（{{ grading_model }}）の提供がGoogleによって終了したため、採点できませんでした。新しいモデルへの移行と、採点精度の再検証が済みしだい再開します。
+            {% elif job.status.value == 'failed' %}
                 時間をおいて、もう一度提出してください。今回の提出は1日の上限回数に数えません。
             {% else %}
                 通常20〜40秒ほどかかります。このページは閉じても大丈夫です。結果はあとで問題の詳細から確認できます。
             {% endif %}
         </p>
         <p id="grading-elapsed" class="grading-note"></p>
-        <a id="grading-retry" href="/solve/{{ problem.id }}"{% if job.status.value != 'failed' %} hidden{% endif %}>もう一度提出する</a>
+        <a id="grading-retry" href="/solve/{{ problem.id }}"{% if job.status.value != 'failed' or job.failure_reason == 'model_unavailable' %} hidden{% endif %}>もう一度提出する</a>
+        {% if sample_available() %}
+        <p id="grading-sample" class="grading-note"{% if job.status.value != 'failed' %} hidden{% endif %}><a href="/sample">実際の採点結果の見本を見る</a></p>
+        {% endif %}
     </div>
 
     <div style="margin-top: 20px; text-align: center;">
@@ -49,11 +56,18 @@
         const elapsed = document.getElementById("grading-elapsed");
         const startedAt = Date.now();
 
-        function showFailed() {
+        function showFailed(reason) {
             card.classList.add("grading-failed");
+            elapsed.textContent = "";
+            const sample = document.getElementById("grading-sample");
+            if (sample) sample.hidden = false;
+            if (reason === "model_unavailable") {
+                title.textContent = "AIモデルが使えなくなりました";
+                detail.textContent = `採点に使っているAIモデル（${card.dataset.model}）の提供がGoogleによって終了したため、採点できませんでした。新しいモデルへの移行と、採点精度の再検証が済みしだい再開します。`;
+                return;
+            }
             title.textContent = "採点できませんでした";
             detail.textContent = "時間をおいて、もう一度提出してください。今回の提出は1日の上限回数に数えません。";
-            elapsed.textContent = "";
             document.getElementById("grading-retry").hidden = false;
         }
 
@@ -65,7 +79,7 @@
                 if (response.ok) {
                     const job = await response.json();
                     if (job.status === "succeeded") { location.replace(`/answer/${job.submission_id}`); return; }
-                    if (job.status === "failed") { showFailed(); return; }
+                    if (job.status === "failed") { showFailed(job.failure_reason); return; }
                     if (job.status === "queued" && job.attempts > 0) {
                         detail.textContent = "AIが混み合っているため、自動で再試行しています…";
                     }

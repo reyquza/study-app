@@ -58,9 +58,15 @@
                 </div>
                 
                 <div style="text-align: center;">
+                    {% if model_unavailable() %}
+                    <button id="submit-btn" type="button" disabled style="background-color: #9e9e9e; width: 100%;">
+                        AI採点は停止中です（画面上部のお知らせ参照）
+                    </button>
+                    {% else %}
                     <button id="submit-btn" type="submit" style="background-color: #1976D2; width: 100%;">
                         AIに採点してもらう
                     </button>
+                    {% endif %}
                 </div>
             </form>
         </div>
