@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}
-    採点中
+    {{ _("採点中") }}
 {% endblock title %}
 
 {% block content %}
@@ -17,37 +17,45 @@
         .grading-note { color: #666; font-size: 0.9em; }
     </style>
 
+    {% set text = {
+        "title_gone": _("AIモデルが使えなくなりました"),
+        "detail_gone": _("採点に使っているAIモデル（{model}）の提供がGoogleによって終了したため、採点できませんでした。新しいモデルへの移行と、採点精度の再検証が済みしだい再開します。", model=grading_model),
+        "title_failed": _("採点できませんでした"),
+        "detail_failed": _("時間をおいて、もう一度提出してください。今回の提出は1日の上限回数に数えません。"),
+        "title_grading": _("AIが採点しています"),
+        "detail_grading": _("通常20〜40秒ほどかかります。このページは閉じても大丈夫です。結果はあとで問題の詳細から確認できます。"),
+        "retrying": _("AIが混み合っているため、自動で再試行しています…"),
+        "elapsed": _("{seconds}秒経過"),
+    } %}
+
     <div id="grading" class="day-block grading-card{% if job.status.value == 'failed' %} grading-failed{% endif %}"
-         data-job-url="/api/grading-jobs/{{ job.id }}" data-model="{{ grading_model }}">
+         data-job-url="/api/grading-jobs/{{ job.id }}">
         <div class="grading-spinner" aria-hidden="true"></div>
         <h3 id="grading-title" aria-live="polite">
-            {% if job.failure_reason == 'model_unavailable' %}AIモデルが使えなくなりました
-            {% elif job.status.value == 'failed' %}採点できませんでした
-            {% else %}AIが採点しています{% endif %}
+            {% if job.failure_reason == 'model_unavailable' %}{{ text.title_gone }}
+            {% elif job.status.value == 'failed' %}{{ text.title_failed }}
+            {% else %}{{ text.title_grading }}{% endif %}
         </h3>
         <p id="grading-detail" class="grading-note">
-            {% if job.failure_reason == 'model_unavailable' %}
-                採点に使っているAIモデル（{{ grading_model }}）の提供がGoogleによって終了したため、採点できませんでした。新しいモデルへの移行と、採点精度の再検証が済みしだい再開します。
-            {% elif job.status.value == 'failed' %}
-                時間をおいて、もう一度提出してください。今回の提出は1日の上限回数に数えません。
-            {% else %}
-                通常20〜40秒ほどかかります。このページは閉じても大丈夫です。結果はあとで問題の詳細から確認できます。
-            {% endif %}
+            {% if job.failure_reason == 'model_unavailable' %}{{ text.detail_gone }}
+            {% elif job.status.value == 'failed' %}{{ text.detail_failed }}
+            {% else %}{{ text.detail_grading }}{% endif %}
         </p>
         <p id="grading-elapsed" class="grading-note"></p>
-        <a id="grading-retry" href="/solve/{{ problem.id }}"{% if job.status.value != 'failed' or job.failure_reason == 'model_unavailable' %} hidden{% endif %}>もう一度提出する</a>
+        <a id="grading-retry" href="/solve/{{ problem.id }}"{% if job.status.value != 'failed' or job.failure_reason == 'model_unavailable' %} hidden{% endif %}>{{ _("もう一度提出する") }}</a>
         {% if sample_available() %}
-        <p id="grading-sample" class="grading-note"{% if job.status.value != 'failed' %} hidden{% endif %}><a href="/sample">実際の採点結果の見本を見る</a></p>
+        <p id="grading-sample" class="grading-note"{% if job.status.value != 'failed' %} hidden{% endif %}><a href="/sample{% if lang == 'en' %}#english{% endif %}">{{ _("実際の採点結果の見本を見る") }}</a></p>
         {% endif %}
     </div>
 
     <div style="margin-top: 20px; text-align: center;">
-        <a href="/" style="color: #666; text-decoration: none;">← ホームに戻る</a>
+        <a href="/" style="color: #666; text-decoration: none;">← {{ _("ホームに戻る") }}</a>
     </div>
 
     <noscript><meta http-equiv="refresh" content="5"></noscript>
     <script>
     (() => {
+        const T = {{ text | tojson }};
         const card = document.getElementById("grading");
         if (card.classList.contains("grading-failed")) return;
 
@@ -62,17 +70,17 @@
             const sample = document.getElementById("grading-sample");
             if (sample) sample.hidden = false;
             if (reason === "model_unavailable") {
-                title.textContent = "AIモデルが使えなくなりました";
-                detail.textContent = `採点に使っているAIモデル（${card.dataset.model}）の提供がGoogleによって終了したため、採点できませんでした。新しいモデルへの移行と、採点精度の再検証が済みしだい再開します。`;
+                title.textContent = T.title_gone;
+                detail.textContent = T.detail_gone;
                 return;
             }
-            title.textContent = "採点できませんでした";
-            detail.textContent = "時間をおいて、もう一度提出してください。今回の提出は1日の上限回数に数えません。";
+            title.textContent = T.title_failed;
+            detail.textContent = T.detail_failed;
             document.getElementById("grading-retry").hidden = false;
         }
 
         async function poll() {
-            elapsed.textContent = `${Math.round((Date.now() - startedAt) / 1000)}秒経過`;
+            elapsed.textContent = T.elapsed.replace("{seconds}", Math.round((Date.now() - startedAt) / 1000));
             try {
                 const response = await fetch(card.dataset.jobUrl, { headers: { Accept: "application/json" } });
                 if (response.status === 401) { location.href = "/login"; return; }
@@ -81,7 +89,7 @@
                     if (job.status === "succeeded") { location.replace(`/answer/${job.submission_id}`); return; }
                     if (job.status === "failed") { showFailed(job.failure_reason); return; }
                     if (job.status === "queued" && job.attempts > 0) {
-                        detail.textContent = "AIが混み合っているため、自動で再試行しています…";
+                        detail.textContent = T.retrying;
                     }
                 }
             } catch (error) {

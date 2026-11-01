@@ -33,9 +33,13 @@ _EXTENSION_MIME_TYPES = {
 
 
 class UploadRejected(Exception):
-    def __init__(self, message: str, status_code: int = status.HTTP_400_BAD_REQUEST):
-        super().__init__(message)
-        self.message = message
+    """`template` is the Japanese message with {placeholders}; app.web.i18n translates it."""
+
+    def __init__(self, template: str, status_code: int = status.HTTP_400_BAD_REQUEST, **values):
+        self.template = template
+        self.values = values
+        self.message = template.format(**values)
+        super().__init__(self.message)
         self.status_code = status_code
 
 
@@ -71,7 +75,7 @@ async def read_validated_upload(upload: UploadFile) -> ValidatedUpload:
 
     # iPhones sometimes send HEIC as application/octet-stream, so the extension also counts.
     if content_type not in ALLOWED_CONTENT_TYPES and extension not in ALLOWED_EXTENSIONS:
-        raise UploadRejected(f"許可されていないファイル形式です。({content_type} / {extension})")
+        raise UploadRejected("許可されていないファイル形式です。({content_type} / {extension})", content_type=content_type, extension=extension)
 
     data = await upload.read()
     if len(data) > config.MAX_UPLOAD_BYTES:
@@ -92,7 +96,7 @@ async def read_validated_upload(upload: UploadFile) -> ValidatedUpload:
         if pages is None:
             raise UploadRejected("PDFを読み込めませんでした。画像で送るか、別のPDFをお試しください。")
         if pages > config.MAX_PDF_PAGES:
-            raise UploadRejected(f"PDFは{config.MAX_PDF_PAGES}ページまでです。")
+            raise UploadRejected("PDFは{pages}ページまでです。", pages=config.MAX_PDF_PAGES)
 
     return ValidatedUpload(file=FilePart(data=data, mime_type=mime_type), extension=extension)
 

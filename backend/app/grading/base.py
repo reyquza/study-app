@@ -11,6 +11,8 @@ class GradingRequest:
     answer: FilePart
     problem_text: str | None = None
     problem_file: FilePart | None = None
+    # Language of the written feedback. "ja" sends the evaluated prompt unchanged.
+    language: str = "ja"
 
 
 class GradingResult(BaseModel):

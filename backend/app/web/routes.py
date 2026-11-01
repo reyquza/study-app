@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app import clock, config, samples, worker
 from app.grading import availability
+from app.web import i18n
 from app.database import get_db
 from app.dependencies import get_current_user, get_optional_user
 from app.models import JobStatus, User
@@ -28,7 +29,7 @@ from app.services import submissions as submission_service
 
 
 WEB_DIR = Path(__file__).resolve().parent
-templates = Jinja2Templates(directory=WEB_DIR / "templates")
+templates = Jinja2Templates(directory=WEB_DIR / "templates", context_processors=[i18n.template_context])
 # Read by base.html, the grading page and the login page on every render.
 templates.env.globals.update(
     grading_model=config.GEMINI_MODEL,
@@ -46,9 +47,25 @@ ERROR_MESSAGES = {
 }
 
 
-def _too_long(value: str | None, limit: int, label: str) -> None:
+def _too_long(request: Request, value: str | None, limit: int, label: str) -> None:
     if value is not None and len(value) > limit:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{label}は{limit}文字までです。")
+        language = i18n.pick_language(request)
+        detail = i18n.translate("{label}は{limit}文字までです。", language, label=i18n.translate(label, language), limit=limit)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+
+def _upload_error(request: Request, exc: storage.UploadRejected) -> HTTPException:
+    detail = i18n.translate(exc.template, i18n.pick_language(request), **exc.values)
+    return HTTPException(status_code=exc.status_code, detail=detail)
+
+
+def _local_path(referer: str | None) -> str:
+    """The path (and query) of a Referer on this site, or "/". Only the path is kept, so a
+    forged Referer cannot redirect to another site."""
+    parts = urlsplit(referer or "/")
+    path = parts.path + (f"?{parts.query}" if parts.query else "")
+    # Browsers read "/\host" like "//host", so both forms are refused.
+    return path if path.startswith("/") and not path.startswith(("//", "/\\")) else "/"
 
 
 def _redirect(url: str) -> RedirectResponse:
@@ -79,6 +96,18 @@ def sample_page(request: Request, user: User | None = Depends(get_optional_user)
     if sample is None:
         return _redirect("/")
     return templates.TemplateResponse(request, "sample.html", {"sample": sample})
+
+
+@router.get("/lang/{code}")
+def set_language(code: str, request: Request):
+    """The English / 日本語 switch: remember the choice and go back to the same page."""
+    response = _redirect(_local_path(request.headers.get("referer")))
+    if code in i18n.LANGUAGES:
+        response.set_cookie(
+            i18n.COOKIE_NAME, code, max_age=365 * 24 * 60 * 60, path="/",
+            httponly=True, secure=config.IS_PRODUCTION, samesite="lax",
+        )
+    return response
 
 
 @router.get("/logout")
@@ -188,13 +217,8 @@ def delete_task(
     user: User = Depends(get_current_user),
 ):
     plan_service.delete_plan(db, user.id, plan_id)
-    # Go back to the page the delete button was on (home or a day view). Only the path is
-    # kept so a forged Referer cannot redirect to another site.
-    referer = urlsplit(request.headers.get("referer", "/"))
-    back_to = referer.path + (f"?{referer.query}" if referer.query else "")
-    # Browsers read "/\host" like "//host", so both forms are refused.
-    is_local = back_to.startswith("/") and not back_to.startswith(("//", "/\\"))
-    return _redirect(back_to if is_local else "/")
+    # Go back to the page the delete button was on (home or a day view).
+    return _redirect(_local_path(request.headers.get("referer")))
 
 
 @router.get("/confirm-problem/{problem_id}")
@@ -228,6 +252,7 @@ def register_problem_page(
 
 @router.post("/register-problem")
 async def register_problem(
+    request: Request,
     image: UploadFile = File(...),
     text: str | None = Form(None),
     source: str | None = Form(None),
@@ -237,13 +262,16 @@ async def register_problem(
     user: User = Depends(get_current_user),
 ):
     # The text goes into every grading prompt, which is billed per token.
-    _too_long(text, config.MAX_PROBLEM_TEXT_CHARS, "問題文")
-    _too_long(source, config.MAX_SOURCE_CHARS, "出典")
+    _too_long(request, text, config.MAX_PROBLEM_TEXT_CHARS, "問題文")
+    _too_long(request, source, config.MAX_SOURCE_CHARS, "出典")
     tag_names = problem_service.parse_tag_names(tags)
     if len(tag_names) > config.MAX_TAGS or any(len(name) > config.MAX_TAG_CHARS for name in tag_names):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"タグは{config.MAX_TAGS}個まで、1つ{config.MAX_TAG_CHARS}文字までです。",
+            detail=i18n.translate(
+                "タグは{count}個まで、1つ{chars}文字までです。", i18n.pick_language(request),
+                count=config.MAX_TAGS, chars=config.MAX_TAG_CHARS,
+            ),
         )
     try:
         problem_service.check_problem_limit(db, user)
@@ -253,7 +281,7 @@ async def register_problem(
     try:
         upload = await storage.read_validated_upload(image)
     except storage.UploadRejected as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.message)
+        raise _upload_error(request, exc)
 
     try:
         problem_service.create_problem(
@@ -286,6 +314,7 @@ def solve_page(
 
 @router.post("/submit-answer/{problem_id}")
 async def submit_answer(
+    request: Request,
     problem_id: int,
     answer_image: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -301,9 +330,9 @@ async def submit_answer(
 
     try:
         upload = await storage.read_validated_upload(answer_image)
-        job = await grading_jobs.enqueue_grading(db, user, problem, upload)
+        job = await grading_jobs.enqueue_grading(db, user, problem, upload, language=i18n.pick_language(request))
     except storage.UploadRejected as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.message)
+        raise _upload_error(request, exc)
     except grading_jobs.GradingLimitReached as exc:
         return _redirect("/?error=guest_limit" if exc.scope == "guest" else "/?error=limit_reached")
 
@@ -348,13 +377,14 @@ def answer_page(
 
 @router.post("/update-memo/{submission_id}")
 def update_memo(
+    request: Request,
     submission_id: int,
     mistake: str = Form(""),
     user_memo: str = Form(""),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    _too_long(mistake, config.MAX_MEMO_CHARS, "ミス")
-    _too_long(user_memo, config.MAX_MEMO_CHARS, "メモ")
+    _too_long(request, mistake, config.MAX_MEMO_CHARS, "ミス")
+    _too_long(request, user_memo, config.MAX_MEMO_CHARS, "メモ")
     submission_service.save_reflection(db, user.id, submission_id, mistake, user_memo)
     return _redirect("/")

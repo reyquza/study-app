@@ -6,11 +6,13 @@ AI grading for handwritten math answers. A student photographs a problem and the
 handwritten solution; NextLearn scores it out of 100 with partial credit, explains
 where the reasoning went wrong, and schedules the problem for review.
 
-**Live demo: https://nextlearn-7ey4.onrender.com/** — the UI and the AI feedback are in
-Japanese because the users are Japanese students. A graded sample with an English
-translation is at [/sample](https://nextlearn-7ey4.onrender.com/sample#english), no sign-up
-needed; "登録せずに試す" starts a guest session. Grading is capped per day to keep the model
-bill bounded.
+**Live demo: https://nextlearn-7ey4.onrender.com/** — the UI follows the browser's language
+(English or Japanese, with a switch on every page), and English visitors get the AI's
+feedback in English. "Try it without an account" starts a guest session; a real graded
+sample is at [/sample](https://nextlearn-7ey4.onrender.com/sample), no sign-up needed.
+Grading is capped per day to keep the model bill bounded. The grading prompt itself is the
+Japanese one the evaluation measures; English visitors get one extra line asking for English
+output.
 
 I built the first version in March 2026, shortly after I started programming, for my
 sister, who was preparing for a Japanese university entrance exam. Version 2, in progress

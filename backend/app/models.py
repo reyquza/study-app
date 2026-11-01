@@ -149,6 +149,8 @@ class GradingJob(Base):
 
     # Which model graded the answer, so results can be compared across grader versions.
     grader_model: Mapped[Optional[str]] = mapped_column(String(100))
+    # Language of the written feedback: "ja" (the evaluated setting) or "en".
+    language: Mapped[str] = mapped_column(String(8), default="ja", server_default="ja")
     submission_id: Mapped[Optional[int]] = mapped_column(ForeignKey("submissions.id"))
     submission: Mapped[Optional["Submission"]] = relationship()
 

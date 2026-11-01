@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}予定表{% endblock title %}
+{% block title %}{{ _("予定表") }}{% endblock title %}
 
 {% block content %}
 <style>
@@ -61,14 +61,14 @@
 
 <div class="calendar-container">
     <div class="calendar-header">
-        <h3 style="margin: 0;"><strong>{{ view.year }}年 {{ view.month }}月の予定</strong></h3>
-        <a href="/schedule" style="font-size: 0.9em; color: #1976D2; text-decoration: none;">今月へ戻る</a>
-        <a href="/" style="font-size: 0.9em; color: #1976D2; text-decoration: none;">ホームへ戻る</a>
+        <h3 style="margin: 0;"><strong>{{ _("{year}年 {month}月の予定", year=view.year, month=view.month) }}</strong></h3>
+        <a href="/schedule" style="font-size: 0.9em; color: #1976D2; text-decoration: none;">{{ _("今月へ戻る") }}</a>
+        <a href="/" style="font-size: 0.9em; color: #1976D2; text-decoration: none;">{{ _("ホームへ戻る") }}</a>
     </div>
 
     <table class="calendar-table">
         <tr>
-            <th class="sun">日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th class="sat">土</th>
+            <th class="sun">{{ _("日") }}</th><th>{{ _("月") }}</th><th>{{ _("火") }}</th><th>{{ _("水") }}</th><th>{{ _("木") }}</th><th>{{ _("金") }}</th><th class="sat">{{ _("土") }}</th>
         </tr>
         {% for week in view.weeks %}
         <tr>
@@ -86,12 +86,12 @@
                         
                         {% for plan in daily_plans[:3] %}
                             <div class="todo-bar {% if plan.is_completed %}completed{% endif %}">
-                                {{ plan.problem.source or "出典なし" }}
+                                {{ plan.problem.source or _("出典なし") }}
                             </div>
                         {% endfor %}
                         
                         {% if daily_plans|length > 3 %}
-                            <div class="more-todos">+{{ daily_plans|length - 3 }}件</div>
+                            <div class="more-todos">{{ _("+{n}件", n=daily_plans|length - 3) }}</div>
                         {% endif %}
                     </a>
                 {% endif %}
@@ -102,8 +102,8 @@
     </table>
 
     <div class="month-nav">
-        <a href="/schedule?year={{ view.previous[0] }}&month={{ view.previous[1] }}">← 前の月へ</a>
-        <a href="/schedule?year={{ view.next[0] }}&month={{ view.next[1] }}">次の月へ →</a>
+        <a href="/schedule?year={{ view.previous[0] }}&month={{ view.previous[1] }}">← {{ _("前の月へ") }}</a>
+        <a href="/schedule?year={{ view.next[0] }}&month={{ view.next[1] }}">{{ _("次の月へ") }} →</a>
     </div>
     <br>
     <br>

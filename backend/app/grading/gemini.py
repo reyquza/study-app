@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from app import config
 from app.grading.base import GradingFailed, GradingRequest, GradingResult, ModelUnavailable
-from app.grading.prompts import KYUSHU_MATH_TUTOR_V1
+from app.grading.prompts import ENGLISH_FEEDBACK, KYUSHU_MATH_TUTOR_V1
 from app.services.storage import FilePart
 
 
@@ -20,7 +20,8 @@ class GeminiGrader:
         self.model_name = model_name
 
     def grade(self, request: GradingRequest) -> GradingResult:
-        contents: list[str | types.Part] = [KYUSHU_MATH_TUTOR_V1]
+        prompt = KYUSHU_MATH_TUTOR_V1 + (ENGLISH_FEEDBACK if request.language == "en" else "")
+        contents: list[str | types.Part] = [prompt]
         if request.problem_text:
             contents.append(f"【問題文】\n{request.problem_text}")
         if request.problem_file:

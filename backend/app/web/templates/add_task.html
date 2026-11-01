@@ -1,16 +1,16 @@
 {% extends 'base.html' %}
-{% block title %}タスク追加{% endblock title %}
+{% block title %}{{ _("タスク追加") }}{% endblock title %}
 
 {% block content %}
 <header style="margin-bottom: 20px;">
-    <h3>{{ date }} にタスクを追加</h3>
+    <h3>{{ _("{date} にタスクを追加", date=date) }}</h3>
 </header>
 
 <main>
     <div class="day-block" style="background-color: #f1f8e9; border-color: #c8e6c9;">
-        <p style="color: #388e3c; font-weight: bold; margin-top: 0;">追加する問題を選択してください（複数選択可）</p>
+        <p style="color: #388e3c; font-weight: bold; margin-top: 0;">{{ _("追加する問題を選択してください（複数選択可）") }}</p>
         
-        <input type="text" id="search-input" placeholder=" タグや出典で検索..." style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 20px; box-sizing: border-box; font-size: 1em;">
+        <input type="text" id="search-input" placeholder="{{ _('タグや出典で検索...') }}" style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 20px; box-sizing: border-box; font-size: 1em;">
 
         <form action="/add-task/{{ date }}" method="post">
             <div id="problem-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px;">
@@ -23,7 +23,7 @@
                         
                         <div style="margin-bottom: 10px; padding-right: 30px;">
                             <span style="font-size: 0.8em; color: #666;">ID: {{ problem.id }}</span><br>
-                            <strong class="problem-source" style="color: #333;">{{ problem.source or "出典なし" }}</strong>
+                            <strong class="problem-source" style="color: #333;">{{ problem.source or _("出典なし") }}</strong>
                         </div>
                         
                         <div class="problem-tags" style="margin-bottom: 10px;">
@@ -34,11 +34,11 @@
                         
                         <div style="height: 100px; overflow: hidden; border-top: 1px solid #eee; padding-top: 10px; position: relative;">
                             {% if problem.problem_image_path %}
-                                <img src="{{ problem.problem_image_path }}" alt="問題画像" style="width: 100%; height: 100%; object-fit: contain; object-position: top left;">
+                                <img src="{{ problem.problem_image_path }}" alt="{{ _('問題画像') }}" style="width: 100%; height: 100%; object-fit: contain; object-position: top left;">
                             {% elif problem.problem_text %}
                                 <p style="font-size: 0.85em; color: #555; margin: 0; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;">{{ problem.problem_text }}</p>
                             {% else %}
-                                <p style="font-size: 0.8em; color: #aaa; margin: 0;">画像・テキストなし</p>
+                                <p style="font-size: 0.8em; color: #aaa; margin: 0;">{{ _("画像・テキストなし") }}</p>
                             {% endif %}
                             <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 30px; background: linear-gradient(transparent, white);"></div>
                         </div>
@@ -48,14 +48,14 @@
             
             <div style="text-align: center; position: sticky; bottom: 20px; z-index: 10;">
                 <button type="submit" style="background-color: #4CAF50; color: white; border: none; padding: 15px 30px; border-radius: 30px; font-size: 1.1em; font-weight: bold; width: 100%; max-width: 400px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); cursor: pointer;">
-                    選択したタスクを追加する
+                    {{ _("選択したタスクを追加する") }}
                 </button>
             </div>
         </form>
     </div>
     
     <div style="margin-top: 20px; text-align: center; padding-bottom: 40px;">
-        <a href="/schedule/{{ date }}" style="color: #666; text-decoration: none;">← キャンセルして戻る</a>
+        <a href="/schedule/{{ date }}" style="color: #666; text-decoration: none;">← {{ _("キャンセルして戻る") }}</a>
     </div>
 </main>
 
