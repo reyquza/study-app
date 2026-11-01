@@ -15,6 +15,7 @@ dependencies = [
     "pwdlib[argon2]>=0.3.1",
     "pydantic>=2.12.5",
     "pyjwt>=2.15.1",
+    "pypdf>=5",
     "python-dotenv>=1.2.2",
     "python-multipart>=0.0.22",
     "requests>=2.32.5",

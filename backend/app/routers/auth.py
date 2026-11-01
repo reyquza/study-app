@@ -15,6 +15,10 @@ router = APIRouter(
 )
 
 
+def _too_many_requests() -> HTTPException:
+    return HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many attempts. Try again later")
+
+
 @router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def sign_up(
     body: SignUpRequest,
@@ -29,6 +33,8 @@ def sign_up(
             status_code=status.HTTP_409_CONFLICT,
             detail="An account with this email already exists",
         )
+    except auth_service.TooManyAttempts:
+        raise _too_many_requests()
 
     set_session_cookie(response, user.id)
     return user
@@ -43,6 +49,8 @@ def login(body: LoginRequest, response: Response, db: Session = Depends(get_db))
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
         )
+    except auth_service.TooManyAttempts:
+        raise _too_many_requests()
 
     set_session_cookie(response, user.id)
     return user
@@ -50,7 +58,10 @@ def login(body: LoginRequest, response: Response, db: Session = Depends(get_db))
 
 @router.post("/guest", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def start_guest_session(response: Response, db: Session = Depends(get_db)) -> User:
-    user = auth_service.create_guest(db)
+    try:
+        user = auth_service.create_guest(db)
+    except auth_service.TooManyAttempts:
+        raise _too_many_requests()
     set_session_cookie(response, user.id)
     return user
 

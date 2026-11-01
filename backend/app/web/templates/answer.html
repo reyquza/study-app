@@ -48,10 +48,10 @@
             
             <form action="/update-memo/{{ submission.id }}" method="post">
                 <label for="mistake" style="font-size: 0.9em; color: #555;">今回の主なミス（一言で）</label>
-                <input type="text" id="mistake" name="mistake" placeholder="例：場合分けの条件を見落とした">
+                <input type="text" id="mistake" name="mistake" maxlength="2000" placeholder="例：場合分けの条件を見落とした">
                 
                 <label for="user_memo" style="font-size: 0.9em; color: #555;">次に活かすためのメモ</label>
-                <input type="text" id="user_memo" name="user_memo" placeholder="例：絶対値を外すときは必ず数直線を書く！">
+                <input type="text" id="user_memo" name="user_memo" maxlength="2000" placeholder="例：絶対値を外すときは必ず数直線を書く！">
                 
                 <div style="text-align: center; margin-top: 10px;">
                     <button type="submit" class="btn-warning" style="width: 100%;">記録を保存してホームへ戻る</button>

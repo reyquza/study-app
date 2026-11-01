@@ -49,8 +49,36 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
 DAILY_GRADING_LIMIT = int(os.getenv("DAILY_GRADING_LIMIT", "5"))
 # Cap across all users, so open sign-up cannot run up the model bill.
 GLOBAL_DAILY_GRADING_LIMIT = int(os.getenv("GLOBAL_DAILY_GRADING_LIMIT", "300"))
+# Caps shared by all guest users together: anyone can create guests, so a per-user limit
+# alone does not bound what guests can spend.
+GUEST_GRADING_LIMITS = (
+    (timedelta(minutes=1), int(os.getenv("GUEST_GRADING_LIMIT_PER_MINUTE", "5"))),
+    (timedelta(hours=1), int(os.getenv("GUEST_GRADING_LIMIT_PER_HOUR", "30"))),
+)
+GUEST_DAILY_GRADING_LIMIT = int(os.getenv("GUEST_DAILY_GRADING_LIMIT", "50"))
 # A model call must finish well within the job lease, or another worker may pick the job up again.
 GRADING_TIMEOUT = timedelta(seconds=90)
+# Caps thinking plus visible output per call, which bounds what one call can cost. Measured
+# gradings use 3k-16k; a call that hits the cap fails without a retry.
+GRADING_MAX_OUTPUT_TOKENS = int(os.getenv("GRADING_MAX_OUTPUT_TOKENS", "20000"))
+
+# Problem registration stores an upload; cap it so open sign-up cannot exhaust file storage.
+DAILY_PROBLEM_LIMIT = int(os.getenv("DAILY_PROBLEM_LIMIT", "20"))
+GUEST_DAILY_PROBLEM_LIMIT = int(os.getenv("GUEST_DAILY_PROBLEM_LIMIT", "100"))
+# Text that reaches the model or the database. The model is billed per token.
+MAX_PROBLEM_TEXT_CHARS = 2000
+MAX_SOURCE_CHARS = 200
+MAX_TAGS = 10
+MAX_TAG_CHARS = 50
+MAX_MEMO_CHARS = 2000
+
+# Abuse limits on account endpoints. In memory, which is exact while the app runs as one
+# process (the deployment does); with several processes each would allow this much.
+LOGIN_FAILURE_LIMIT = (10, timedelta(minutes=15))  # per email
+NEW_GUEST_LIMIT = (30, timedelta(minutes=1))  # across everyone
+NEW_ACCOUNT_LIMIT = (30, timedelta(minutes=1))  # across everyone
+# Argon2 uses 64 MiB per hash; bound concurrent hashes so a burst of logins cannot exhaust memory.
+MAX_CONCURRENT_PASSWORD_HASHES = 2
 
 # Background grading worker (app.worker). On a single server it runs inside the web
 # process; set RUN_WORKER_IN_PROCESS=false and run `python -m app.worker` to scale it separately.
@@ -64,6 +92,8 @@ CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME")
 CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY")
 CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET")
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+# The model bills every PDF page as input, so a long PDF would make one grading expensive.
+MAX_PDF_PAGES = 5
 
 RECENT_PROBLEMS_LIMIT = 30
 

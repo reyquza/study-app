@@ -11,6 +11,12 @@ from app.services import problems as problem_service
 from app.services import storage
 
 
+LIMIT_MESSAGES = {
+    "user": "Daily grading limit reached",
+    "guest": "Guest grading is busy. Try again later, or sign up to keep grading",
+    "global": "Grading is at capacity for today",
+}
+
 router = APIRouter(
     prefix="/api",
     tags=["grading"],
@@ -37,11 +43,11 @@ async def submit_answer(
 
     try:
         upload = await storage.read_validated_upload(answer_image)
-        job = await grading_jobs.enqueue_grading(db, user.id, problem, upload)
+        job = await grading_jobs.enqueue_grading(db, user, problem, upload)
     except storage.UploadRejected as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.message)
-    except grading_jobs.DailyLimitReached:
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Daily grading limit reached")
+    except grading_jobs.GradingLimitReached as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=LIMIT_MESSAGES[exc.scope])
 
     worker.notify_new_job()
     return job

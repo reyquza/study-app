@@ -92,7 +92,11 @@ class GradingWorker:
             if not isinstance(exc, EXPECTED_ERRORS):
                 logger.exception("Unexpected error grading job %s", claimed.id)
             await run_in_threadpool(
-                self._with_session, grading_jobs.fail_attempt, claimed, f"{type(exc).__name__}: {exc}"
+                self._with_session,
+                grading_jobs.fail_attempt,
+                claimed,
+                f"{type(exc).__name__}: {exc}",
+                getattr(exc, "retryable", True),
             )
             return True
 
