@@ -8,37 +8,37 @@
     {% set en = sample.english if lang == 'en' and sample.english else none %}
     <header>
         <h3>{{ _("採点結果の見本") }}</h3>
-        <p style="color: #555; line-height: 1.6;">
+        <p style="color: var(--ink-muted); line-height: 1.7; margin: 6px 0 0;">
             {{ en.note if en else sample.note }}
             {{ _("（採点日 {date}、モデル {model}）", date=sample.graded_at, model=sample.model) }}
         </p>
     </header>
 
     <main>
-        <div class="day-block" style="margin-bottom: 20px;">
-            <h4 style="margin-top: 0; color: #4CAF50;">{{ _("問題：") }}{{ en.title if en else sample.title }}</h4>
-            <div class="problem-box" style="background-color: #f9f9f9; padding: 15px; border-left: 4px solid #ccc; white-space: pre-wrap;">{{ en.problem_text if en else sample.problem_text }}</div>
+        <div class="day-block">
+            <h4>{{ _("問題：") }}{{ en.title if en else sample.title }}</h4>
+            <div class="problem-box">{{ en.problem_text if en else sample.problem_text }}</div>
         </div>
 
-        <div class="day-block" style="margin-bottom: 20px;">
-            <h4 style="margin-top: 0; color: #ca13de;">{{ _("答案") }}</h4>
-            <img src="{{ sample.answer_image }}" alt="{{ _('答案画像') }}" style="max-width: 100%; border-radius: 4px;">
+        <div class="day-block">
+            <h4>{{ _("答案") }}</h4>
+            <img src="{{ sample.answer_image }}" alt="{{ _('答案画像') }}" style="max-width: 100%; border-radius: 8px; border: 1px solid var(--line);">
         </div>
 
         <div class="score-container">
-            <h4 style="margin: 0; color: #555;">{{ _("AIによる採点") }}</h4>
-            <div class="score-circle">
-                {{ sample.score }}<span style="font-size: 20px;">{{ _("点") }}</span>
+            <div class="score-circle" style="--score: {{ sample.score }};">
+                {{ sample.score }}<span>{{ _("点") }}</span>
             </div>
+            <h4>{{ _("AIによる採点") }}</h4>
         </div>
 
         <div class="ai-feedback-box">
-            <strong style="color: #3f51b5; display: block; margin-bottom: 10px;">{{ _("AI講師からのアドバイス") }}{% if en %} (translated){% endif %}</strong>
+            <strong>{{ _("AI講師からのアドバイス") }}{% if en %} (translated){% endif %}</strong>
             <div class="ai-text">{{ (en.ai_feedback if en else sample.ai_feedback) | ai_text }}</div>
         </div>
 
         <div class="explanation-box">
-            <strong style="color: #555; display: block; margin-bottom: 10px;">{{ _("模範解答・解説") }}{% if en %} (translated){% endif %}</strong>
+            <strong>{{ _("模範解答・解説") }}{% if en %} (translated){% endif %}</strong>
             <div class="ai-text">{{ (en.explanation if en else sample.explanation) | ai_text }}</div>
         </div>
 
@@ -66,7 +66,7 @@
         </section>
         {% endif %}
 
-        <div style="margin-top: 24px; text-align: center;">
+        <div class="back-link">
             {% if request.state.user %}
             <a href="/">← {{ _("ホームに戻る") }}</a>
             {% else %}

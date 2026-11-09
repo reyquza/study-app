@@ -33,7 +33,7 @@
                                         {{ _("不明") }}
                                     {% endif %}
                                 </td>
-                                <td style="padding: 10px; border: 1px solid #ddd; text-align: center; font-weight: bold; color: #1976D2;">
+                                <td style="padding: 10px; border: 1px solid #ddd; text-align: center; font-weight: bold; color: #1f8a4c;">
                                     {{ _("{score}点", score=submission.score) }}
                                 </td>
                                 <td style="padding: 10px; border: 1px solid #ddd; font-size: 0.9em;">
@@ -41,14 +41,14 @@
                                         <span style="color: #d32f2f; font-weight: bold;">{{ _("ミス:") }}</span> {{ submission.mistake }}<br>
                                     {% endif %}
                                     {% if submission.user_memo %}
-                                        <span style="color: #388e3c; font-weight: bold;">{{ _("メモ:") }}</span> {{ submission.user_memo }}
+                                        <span style="color: #1f8a4c; font-weight: bold;">{{ _("メモ:") }}</span> {{ submission.user_memo }}
                                     {% endif %}
                                     {% if not submission.mistake and not submission.user_memo %}
                                         <span style="color: #aaa;">{{ _("記録なし") }}</span>
                                     {% endif %}
                                 </td>
                                 <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">
-                                    <a href="/answer/{{ submission.id }}" style="background-color: #1976D2; color: white; padding: 5px 10px; text-decoration: none; border-radius: 4px; font-size: 0.8em;">
+                                    <a href="/answer/{{ submission.id }}" style="background-color: #1f8a4c; color: white; padding: 5px 10px; text-decoration: none; border-radius: 4px; font-size: 0.8em;">
                                         {{ _("確認") }}
                                     </a>
                                 </td>

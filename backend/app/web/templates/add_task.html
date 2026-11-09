@@ -7,8 +7,8 @@
 </header>
 
 <main>
-    <div class="day-block" style="background-color: #f1f8e9; border-color: #c8e6c9;">
-        <p style="color: #388e3c; font-weight: bold; margin-top: 0;">{{ _("追加する問題を選択してください（複数選択可）") }}</p>
+    <div class="day-block" style="background-color: #f1f8e9; border-color: #cfe8d8;">
+        <p style="color: #1f8a4c; font-weight: bold; margin-top: 0;">{{ _("追加する問題を選択してください（複数選択可）") }}</p>
         
         <input type="text" id="search-input" placeholder="{{ _('タグや出典で検索...') }}" style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 20px; box-sizing: border-box; font-size: 1em;">
 
@@ -28,7 +28,7 @@
                         
                         <div class="problem-tags" style="margin-bottom: 10px;">
                             {% for tag in problem.tags %}
-                                <span style="background-color: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 12px; font-size: 0.75em; border: 1px solid #c8e6c9; display: inline-block; margin-bottom: 4px;">{{ tag.name }}</span>
+                                <span style="background-color: #e9f6ee; color: #166c3a; padding: 3px 8px; border-radius: 12px; font-size: 0.75em; border: 1px solid #cfe8d8; display: inline-block; margin-bottom: 4px;">{{ tag.name }}</span>
                             {% endfor %}
                         </div>
                         
@@ -47,7 +47,7 @@
             </div>
             
             <div style="text-align: center; position: sticky; bottom: 20px; z-index: 10;">
-                <button type="submit" style="background-color: #4CAF50; color: white; border: none; padding: 15px 30px; border-radius: 30px; font-size: 1.1em; font-weight: bold; width: 100%; max-width: 400px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); cursor: pointer;">
+                <button type="submit" style="background-color: #1f8a4c; color: white; border: none; padding: 15px 30px; border-radius: 30px; font-size: 1.1em; font-weight: bold; width: 100%; max-width: 400px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); cursor: pointer;">
                     {{ _("選択したタスクを追加する") }}
                 </button>
             </div>
@@ -87,7 +87,7 @@
         // カード全体をクリックしたときにも発火させる
         checkbox.addEventListener('change', function() {
             if (this.checked) {
-                card.style.borderColor = '#4CAF50';
+                card.style.borderColor = '#1f8a4c';
                 card.style.backgroundColor = '#f1f8e9';
                 card.style.borderWidth = '2px';
             } else {

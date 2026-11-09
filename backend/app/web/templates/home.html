@@ -5,26 +5,29 @@
 
 {% block content %}
     {% if error_message %}
-        <div style="background-color: #ffebee; color: #c62828; padding: 15px; margin-bottom: 20px; border-radius: 5px; border: 1px solid #ef9a9a; text-align: center; font-weight: bold;">
+        <div class="day-block" style="border-color: #f0b4b4; background: #fdecec; color: #9b2c2c; text-align: center; font-weight: 600; margin-bottom: 16px;">
             {{ _(error_message) }}
             {% if sample_available() %}
             <div style="margin-top: 8px; font-weight: normal;"><a href="/sample{% if lang == 'en' %}#english{% endif %}">{{ _("代わりに、実際の採点結果の見本を見る") }}</a></div>
             {% endif %}
         </div>
     {% endif %}
-    <header>
-        <h3 style="text-align: center;">{{ _("何やってるんですか　勉強してください！") }}</h3>
+
+    <header class="home-hero">
+        <h3>{{ _("何やってるんですか　勉強してください！") }}</h3>
         {% if sample_available() %}
-        <p style="text-align: center; margin: 0;"><a href="/sample{% if lang == 'en' %}#english{% endif %}">{{ _("AIの採点結果の見本を見る") }}</a></p>
+        <p><a href="/sample{% if lang == 'en' %}#english{% endif %}">{{ _("AIの採点結果の見本を見る") }}</a></p>
         {% endif %}
     </header>
 
     <main>
-        <div class="today-section">
-            <p>{{ _("今日の日付：") }} <strong>{{ today.strftime("%Y-%m-%d") }}</strong></p>
+        <div class="home-actions">
+            <a href="/register-problem" class="rounded-btn">{{ _("問題を登録する") }}</a>
+            <a href="/schedule" class="rounded-btn is-secondary">{{ _("予定表を確認・編集する") }}</a>
         </div>
 
         <div class="calendar-section">
+            <p class="today-section">{{ _("今日の日付：") }} <strong>{{ today.strftime("%Y-%m-%d") }}</strong></p>
             <h4>{{ _("未完了のToDo") }}</h4>
             <div>{{ _("3日後までの未完了のToDoが表示されます") }}</div>
             {% if calendar_data %}
@@ -35,18 +38,18 @@
                             <ul>
                                 {% for plan in daily_plans %}
                                     {% if plan.is_completed == False %}
-                                        <li>
-                                        <span style="font-size: 0.9em; color: #666;">{{ _("問題ID:") }} {{ plan.problem_id }}</span>
-                                        <a href="/solve/{{ plan.problem_id }}" style="color: inherit; text-decoration: none; font-weight: bold; display: block; margin: 5px 0;">
-                                            {{ plan.problem.source }}
-                                        </a>
-                                        <span style="color: #d32f2f; font-size: 0.9em;">{{ _("[未完了]") }}</span>
+                                        <li class="todo-item">
+                                            <div>
+                                                <a href="/solve/{{ plan.problem_id }}" class="todo-title">{{ plan.problem.source or _("出典なし") }}</a>
+                                                <div class="todo-meta">{{ _("問題ID:") }} {{ plan.problem_id }}</div>
+                                            </div>
+                                            <div class="todo-actions">
+                                                <a href="/solve/{{ plan.problem_id }}" class="btn btn-secondary" style="padding: 6px 14px; font-size: 0.9rem;">{{ _("問題を解く") }}</a>
+                                                <form action="/delete-task/{{ plan.id }}" method="post" onsubmit='return confirm({{ _("本当にこのタスクを削除しますか？") | tojson }});'>
+                                                    <button type="submit" class="btn-danger">{{ _("タスクを削除") }}</button>
+                                                </form>
+                                            </div>
                                         </li>
-                                        <form action="/delete-task/{{ plan.id }}" method="post" onsubmit='return confirm({{ _("本当にこのタスクを削除しますか？") | tojson }});'>
-                                            <button type="submit" style="display: inline-block; background-color: #56bc17; color: white; text-decoration: none; padding: 8px 15px; border-radius: 4px; font-size: 0.9em; font-weight: bold; margin-bottom: 10px;">
-                                                {{ _("タスクを削除") }}
-                                            </button>
-                                        </form>
                                     {% endif %}
                                 {% endfor %}
                             </ul>
@@ -54,13 +57,8 @@
                     {% endfor %}
                 </div>
             {% else %}
-                <p>{{ _("現在、未完了のTodoはありません。") }}</p>
+                <p class="empty-state">{{ _("現在、未完了のTodoはありません。") }}</p>
             {% endif %}
-        </div>
-        <br>
-        <div style="display: flex; flex-direction: column; align-items: center; gap: 15px; margin-top: 30px; margin-bottom: 20px;">
-            <a href="/schedule" class="rounded-btn">{{ _("予定表を確認・編集する") }}</a>
-            <a href="/register-problem" class="rounded-btn">{{ _("問題を登録する") }}</a>
         </div>
     </main>
 {% endblock content %}

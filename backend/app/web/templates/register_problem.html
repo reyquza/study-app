@@ -12,7 +12,7 @@
                 width:16px;
                 height:16px;
                 border:2px solid #ccc;
-                border-top:2px solid #1976D2;
+                border-top:2px solid #1f8a4c;
                 border-radius:50%;
                 animation: spin 1s linear infinite;
                 margin-right:5px;
@@ -26,21 +26,21 @@
     </header>
 
     <main>
-        <div class="day-block" style="background-color: #f8fcf8; border-color: #c8e6c9;">
+        <div class="day-block" style="background-color: #ffffff; border-color: #cfe8d8;">
             <form action="/register-problem" method="post" enctype="multipart/form-data">
                 
                 <!-- <div style="margin-bottom: 20px;">
-                    <label style="font-weight: bold; color: #2e7d32; display: block; margin-bottom: 5px;">問題の画像 (必須)</label>
-                    <input type="file" name="image" accept="image/*" required style="width: 100%; padding: 10px; border: 1px dashed #4CAF50; background-color: #fff; border-radius: 4px;">
+                    <label style="font-weight: bold; color: #166c3a; display: block; margin-bottom: 5px;">問題の画像 (必須)</label>
+                    <input type="file" name="image" accept="image/*" required style="width: 100%; padding: 10px; border: 1px dashed #1f8a4c; background-color: #fff; border-radius: 4px;">
                 </div> -->
                 <div style="margin-bottom: 20px;">
-                    <label style="font-weight: bold; color: #2e7d32; display: block; margin-bottom: 5px;">{{ _("問題のファイル (画像 または PDF)") }}</label>
-                    <input type="file" id="fileInput" name="image" accept="image/*,application/pdf" required style="width: 100%; padding: 10px; border: 1px dashed #4CAF50; background-color: #fff; border-radius: 4px;">
+                    <label style="font-weight: bold; color: #166c3a; display: block; margin-bottom: 5px;">{{ _("問題のファイル (画像 または PDF)") }}</label>
+                    <input type="file" id="fileInput" name="image" accept="image/*,application/pdf" required style="width: 100%; padding: 10px; border: 1px dashed #1f8a4c; background-color: #fff; border-radius: 4px;">
                 </div>
 
                 <div id="previewContainer" style="margin-bottom: 20px; display: none; text-align: center;">
                     <p style="font-size: 0.8em; color: #888; margin-bottom: 5px;">{{ _("アップロードするファイルのプレビュー") }}</p>
-                    <p id="loadingText" style="display:none; color:#1976D2;">
+                    <p id="loadingText" style="display:none; color:#1f8a4c;">
                         <span class="spinner"></span> {{ _("変換中...") }}
                     </p>
                     <img id="imagePreview" style="max-width: 100%; max-height: 300px; border-radius: 4px; display: none; margin: 0 auto; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
@@ -70,7 +70,7 @@
                 </div>
 
                 <div style="text-align: center;">
-                    <button type="submit" style="background-color: #4CAF50; width: 100%; font-size: 1.1em; padding: 15px;">
+                    <button type="submit" style="background-color: #1f8a4c; width: 100%; font-size: 1.1em; padding: 15px;">
                         {{ _("問題を登録する") }}
                     </button>
                 </div>
