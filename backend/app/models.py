@@ -19,6 +19,9 @@ class User(Base):
     email: Mapped[Optional[str]] = mapped_column(String(255), unique=True)
     password_hash: Mapped[Optional[str]] = mapped_column(String(255))
     is_guest: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # Consecutive failed logins, and the time until which logins are refused after too many.
+    failed_logins: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     problems: Mapped[list["Problem"]] = relationship(back_populates="user", cascade="all, delete-orphan")
@@ -121,6 +124,13 @@ class GradingJob(Base):
     __tablename__ = "grading_jobs"
     __table_args__ = (Index("ix_grading_jobs_status_run_after", "status", "run_after"),)
 
+    @property
+    def failure_reason(self) -> str | None:
+        """"model_unavailable" when the model was shut down, "error" for other failures."""
+        if self.status != JobStatus.FAILED:
+            return None
+        return "model_unavailable" if (self.last_error or "").startswith("ModelUnavailable") else "error"
+
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     problem_id: Mapped[int] = mapped_column(ForeignKey("problems.id"))
@@ -139,6 +149,8 @@ class GradingJob(Base):
 
     # Which model graded the answer, so results can be compared across grader versions.
     grader_model: Mapped[Optional[str]] = mapped_column(String(100))
+    # Language of the written feedback: "ja" (the evaluated setting) or "en".
+    language: Mapped[str] = mapped_column(String(8), default="ja", server_default="ja")
     submission_id: Mapped[Optional[int]] = mapped_column(ForeignKey("submissions.id"))
     submission: Mapped[Optional["Submission"]] = relationship()
 

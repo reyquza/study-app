@@ -40,5 +40,7 @@ class GradingJobResponse(BaseModel):
     attempts: int
     # Set once the job has succeeded; the graded result is /answer/{submission_id}.
     submission_id: int | None
+    # Set when status is "failed": "model_unavailable" (the model was shut down) or "error".
+    failure_reason: str | None
     created_at: datetime
     finished_at: datetime | None

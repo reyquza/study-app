@@ -17,7 +17,8 @@ from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session, sessionmaker
 
 from app import config
-from app.grading.base import Grader, GradingFailed, GradingRequest, GradingResult
+from app.grading import availability
+from app.grading.base import Grader, GradingFailed, GradingRequest, GradingResult, ModelUnavailable
 from app.services import grading_jobs, storage
 from app.services.grading_jobs import ClaimedJob
 
@@ -55,7 +56,7 @@ class GradingWorker:
 
     async def run(self, stop: asyncio.Event) -> None:
         logger.info("Grading worker started (%s slots, model %s)", self._concurrency, self._grader.model_name)
-        await asyncio.gather(*(self._slot(stop) for _ in range(self._concurrency)))
+        await asyncio.gather(self._watch_model(stop), *(self._slot(stop) for _ in range(self._concurrency)))
         logger.info("Grading worker stopped")
 
     async def _slot(self, stop: asyncio.Event) -> None:
@@ -73,6 +74,24 @@ class GradingWorker:
                 except TimeoutError:
                     pass
 
+    async def _watch_model(self, stop: asyncio.Event) -> None:
+        """Check now and every few hours that the model still exists, so a shutdown is shown
+        to visitors before anyone submits an answer."""
+        check = getattr(self._grader, "model_exists", None)
+        if check is None:
+            return
+        while not stop.is_set():
+            exists = await run_in_threadpool(check)
+            if exists is False:
+                logger.error("Grading model %s no longer exists; answers are not accepted", self._grader.model_name)
+                availability.mark_unavailable()
+            elif exists:
+                availability.mark_available()
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=config.MODEL_CHECK_INTERVAL_SECONDS)
+            except TimeoutError:
+                pass
+
     async def run_once(self) -> bool:
         """Claim and process one job. Returns False if there was nothing to do."""
         claimed = await run_in_threadpool(self._with_session, grading_jobs.claim_next_job)
@@ -89,16 +108,24 @@ class GradingWorker:
         try:
             result = await self._grade(claimed)
         except Exception as exc:
-            if not isinstance(exc, EXPECTED_ERRORS):
+            if isinstance(exc, ModelUnavailable):
+                logger.error("Grading model %s no longer exists; answers are not accepted", self._grader.model_name)
+                availability.mark_unavailable()
+            elif not isinstance(exc, EXPECTED_ERRORS):
                 logger.exception("Unexpected error grading job %s", claimed.id)
             await run_in_threadpool(
-                self._with_session, grading_jobs.fail_attempt, claimed, f"{type(exc).__name__}: {exc}"
+                self._with_session,
+                grading_jobs.fail_attempt,
+                claimed,
+                f"{type(exc).__name__}: {exc}",
+                getattr(exc, "retryable", True),
             )
             return True
 
         await run_in_threadpool(
             self._with_session, grading_jobs.complete_job, claimed, result, self._grader.model_name
         )
+        availability.mark_available()
         return True
 
     async def _grade(self, claimed: ClaimedJob) -> GradingResult:
@@ -111,7 +138,12 @@ class GradingWorker:
         # The model SDK is blocking; a thread keeps the event loop (and the web app) responsive.
         return await run_in_threadpool(
             self._grader.grade,
-            GradingRequest(answer=answer, problem_text=claimed.problem_text, problem_file=problem_file),
+            GradingRequest(
+                answer=answer,
+                problem_text=claimed.problem_text,
+                problem_file=problem_file,
+                language=claimed.language,
+            ),
         )
 
     def _with_session(self, fn, *args):

@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
 {% block title %}
-    問題登録
+    {{ _("問題登録") }}
 {% endblock title %}
 
 {% block content %}
     <header>
-        <h3 style="text-align: center;">新しい問題を登録</h3>
+        <h3 style="text-align: center;">{{ _("新しい問題を登録") }}</h3>
         <style>
             .spinner {
                 display:inline-block;
@@ -34,14 +34,14 @@
                     <input type="file" name="image" accept="image/*" required style="width: 100%; padding: 10px; border: 1px dashed #4CAF50; background-color: #fff; border-radius: 4px;">
                 </div> -->
                 <div style="margin-bottom: 20px;">
-                    <label style="font-weight: bold; color: #2e7d32; display: block; margin-bottom: 5px;">問題のファイル (画像 または PDF)</label>
+                    <label style="font-weight: bold; color: #2e7d32; display: block; margin-bottom: 5px;">{{ _("問題のファイル (画像 または PDF)") }}</label>
                     <input type="file" id="fileInput" name="image" accept="image/*,application/pdf" required style="width: 100%; padding: 10px; border: 1px dashed #4CAF50; background-color: #fff; border-radius: 4px;">
                 </div>
 
                 <div id="previewContainer" style="margin-bottom: 20px; display: none; text-align: center;">
-                    <p style="font-size: 0.8em; color: #888; margin-bottom: 5px;">アップロードするファイルのプレビュー</p>
+                    <p style="font-size: 0.8em; color: #888; margin-bottom: 5px;">{{ _("アップロードするファイルのプレビュー") }}</p>
                     <p id="loadingText" style="display:none; color:#1976D2;">
-                        <span class="spinner"></span> 変換中...
+                        <span class="spinner"></span> {{ _("変換中...") }}
                     </p>
                     <img id="imagePreview" style="max-width: 100%; max-height: 300px; border-radius: 4px; display: none; margin: 0 auto; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
                     <iframe id="pdfPreview" style="width: 100%; height: 400px; border: 1px solid #ccc; display: none;"></iframe>
@@ -49,36 +49,36 @@
 
 
                 <div style="margin-bottom: 20px;">
-                    <label style="font-weight: bold; color: #555; display: block; margin-bottom: 5px;">問題文の手動入力 (任意)</label>
-                    <p style="font-size: 0.8em; color: #888; margin: 0 0 5px 0;">画像が読みづらい場合の補助テキストや、OCR結果を入力します。</p>
-                    <textarea name="text" rows="3" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;"></textarea>
+                    <label style="font-weight: bold; color: #555; display: block; margin-bottom: 5px;">{{ _("問題文の手動入力 (任意)") }}</label>
+                    <p style="font-size: 0.8em; color: #888; margin: 0 0 5px 0;">{{ _("画像が読みづらい場合の補助テキストや、OCR結果を入力します。") }}</p>
+                    <textarea name="text" rows="3" maxlength="2000" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;"></textarea>
                 </div>
 
                 <div style="margin-bottom: 20px;">
-                    <label style="font-weight: bold; color: #555; display: block; margin-bottom: 5px;">出典 (任意)</label>
-                    <input type="text" name="source" placeholder="例: 青チャート P.120" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                    <label style="font-weight: bold; color: #555; display: block; margin-bottom: 5px;">{{ _("出典 (任意)") }}</label>
+                    <input type="text" name="source" maxlength="200" placeholder="{{ _('例: 青チャート P.120') }}" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
                 </div>
 
                 <div style="margin-bottom: 20px;">
-                    <label style="font-weight: bold; color: #555; display: block; margin-bottom: 5px;">タグ (任意)</label>
-                    <input type="text" name="tags" placeholder="カンマ区切り（例: 数学, 微積分）" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                    <label style="font-weight: bold; color: #555; display: block; margin-bottom: 5px;">{{ _("タグ (任意)") }}</label>
+                    <input type="text" name="tags" placeholder="{{ _('カンマ区切り（例: 数学, 微積分）') }}" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
                 </div>
 
                 <div style="margin-bottom: 25px;">
-                    <label style="font-weight: bold; color: #555; display: block; margin-bottom: 5px;">解答予定日 (任意)</label>
+                    <label style="font-weight: bold; color: #555; display: block; margin-bottom: 5px;">{{ _("解答予定日 (任意)") }}</label>
                     <input type="date" name="scheduled_date" style="width: 100%; padding: 1px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
                 </div>
 
                 <div style="text-align: center;">
                     <button type="submit" style="background-color: #4CAF50; width: 100%; font-size: 1.1em; padding: 15px;">
-                        問題を登録する
+                        {{ _("問題を登録する") }}
                     </button>
                 </div>
             </form>
         </div>
         
         <div style="margin-top: 20px; text-align: center;">
-            <a href="/" style="color: #666; text-decoration: none;">← ホームに戻る</a>
+            <a href="/" style="color: #666; text-decoration: none;">← {{ _("ホームに戻る") }}</a>
         </div>
     </main>
 
@@ -117,7 +117,7 @@
                 } catch (e) {
                     loadingText.style.display = 'none';
                     console.error(e);
-                    alert("プレビューの表示に失敗しました。");
+                    alert({{ _("プレビューの表示に失敗しました。") | tojson }});
                 }
             }
             

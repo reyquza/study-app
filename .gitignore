@@ -25,3 +25,8 @@ teacher/
 
 # Evaluation data: participants' answers and labels stay out of git
 eval/data/
+
+problems.zip
+imgs_memo/
+note.md
+bugs/

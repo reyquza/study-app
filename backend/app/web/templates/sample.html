@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% block title %}
+    {{ _("採点結果の見本") }}
+{% endblock title %}
+
+{% block content %}
+    {# English visitors read the developer's translation; the AI's own Japanese output stays on the page, unedited. #}
+    {% set en = sample.english if lang == 'en' and sample.english else none %}
+    <header>
+        <h3>{{ _("採点結果の見本") }}</h3>
+        <p style="color: #555; line-height: 1.6;">
+            {{ en.note if en else sample.note }}
+            {{ _("（採点日 {date}、モデル {model}）", date=sample.graded_at, model=sample.model) }}
+        </p>
+    </header>
+
+    <main>
+        <div class="day-block" style="margin-bottom: 20px;">
+            <h4 style="margin-top: 0; color: #4CAF50;">{{ _("問題：") }}{{ en.title if en else sample.title }}</h4>
+            <div class="problem-box" style="background-color: #f9f9f9; padding: 15px; border-left: 4px solid #ccc; white-space: pre-wrap;">{{ en.problem_text if en else sample.problem_text }}</div>
+        </div>
+
+        <div class="day-block" style="margin-bottom: 20px;">
+            <h4 style="margin-top: 0; color: #ca13de;">{{ _("答案") }}</h4>
+            <img src="{{ sample.answer_image }}" alt="{{ _('答案画像') }}" style="max-width: 100%; border-radius: 4px;">
+        </div>
+
+        <div class="score-container">
+            <h4 style="margin: 0; color: #555;">{{ _("AIによる採点") }}</h4>
+            <div class="score-circle">
+                {{ sample.score }}<span style="font-size: 20px;">{{ _("点") }}</span>
+            </div>
+        </div>
+
+        <div class="ai-feedback-box">
+            <strong style="color: #3f51b5; display: block; margin-bottom: 10px;">{{ _("AI講師からのアドバイス") }}{% if en %} (translated){% endif %}</strong>
+            <div style="white-space: pre-wrap;">{{ en.ai_feedback if en else sample.ai_feedback }}</div>
+        </div>
+
+        <div class="explanation-box">
+            <strong style="color: #555; display: block; margin-bottom: 10px;">{{ _("模範解答・解説") }}{% if en %} (translated){% endif %}</strong>
+            <div style="white-space: pre-wrap;">{{ en.explanation if en else sample.explanation }}</div>
+        </div>
+
+        {% if en %}
+        <details id="english" class="day-block" style="margin-top: 24px;" lang="ja">
+            <summary>The AI's original output (Japanese, unedited)</summary>
+            <p><strong>問題</strong></p>
+            <div style="white-space: pre-wrap;">{{ sample.problem_text }}</div>
+            <p><strong>AI講師からのアドバイス</strong></p>
+            <div style="white-space: pre-wrap;">{{ sample.ai_feedback }}</div>
+            <p><strong>模範解答・解説</strong></p>
+            <div style="white-space: pre-wrap;">{{ sample.explanation }}</div>
+        </details>
+        {% elif sample.english %}
+        <section id="english" lang="en" class="day-block" style="margin-top: 24px; line-height: 1.6;">
+            <h4 style="margin-top: 0;">English</h4>
+            <p style="color: #555;">{{ sample.english.note }}</p>
+            <p><strong>Problem.</strong></p>
+            <div style="white-space: pre-wrap;">{{ sample.english.problem_text }}</div>
+            <p><strong>AI score:</strong> {{ sample.score }} / 100</p>
+            <p><strong>AI tutor's advice</strong> (translated):</p>
+            <div style="white-space: pre-wrap;">{{ sample.english.ai_feedback }}</div>
+            <p><strong>Model answer and strategy</strong> (translated):</p>
+            <div style="white-space: pre-wrap;">{{ sample.english.explanation }}</div>
+        </section>
+        {% endif %}
+
+        <div style="margin-top: 24px; text-align: center;">
+            {% if request.state.user %}
+            <a href="/">← {{ _("ホームに戻る") }}</a>
+            {% else %}
+            <a href="/login">{{ _("自分の答案で試す（登録不要のゲストも可）") }}</a>
+            {% endif %}
+        </div>
+    </main>
+{% endblock content %}

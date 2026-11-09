@@ -4,9 +4,11 @@ services:
   - type: web
     name: nextlearn
     runtime: docker
+    # Render resolves the Docker paths against rootDir, so they point inside backend/.
+    # rootDir also limits auto-deploys to commits that change backend/.
     rootDir: backend
-    dockerContext: ./backend
-    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    dockerfilePath: ./Dockerfile
     region: oregon
     plan: 0.5c-512mb
     healthCheckPath: /api/health

@@ -6,6 +6,14 @@ AI grading for handwritten math answers. A student photographs a problem and the
 handwritten solution; NextLearn scores it out of 100 with partial credit, explains
 where the reasoning went wrong, and schedules the problem for review.
 
+**Live demo: https://nextlearn-7ey4.onrender.com/** — the UI follows the browser's language
+(English or Japanese, with a switch on every page), and English visitors get the AI's
+feedback in English. "Try it without an account" starts a guest session; a real graded
+sample is at [/sample](https://nextlearn-7ey4.onrender.com/sample), no sign-up needed.
+Grading is capped per day to keep the model bill bounded. The grading prompt itself is the
+Japanese one the evaluation measures; English visitors get one extra line asking for English
+output.
+
 I built the first version in March 2026, shortly after I started programming, for my
 sister, who was preparing for a Japanese university entrance exam. Version 2, in progress
 on this branch, is about one question: **how far can an AI grader's score be trusted,
@@ -20,10 +28,11 @@ and can the app tell when it should not be?**
 | ✅ | Email + password accounts (Argon2) and one-tap guest accounts that can sign up later and keep their data |
 | ✅ | Grading as background jobs: submitting returns in about a second, a worker grades, the page follows along |
 | ✅ | v2 layout: thin routes over a service layer, grading engine behind a `Grader` interface, tests |
+| ✅ | Always-on deployment (Render + Supabase Postgres) with cost and abuse limits on grading, uploads and accounts |
 | 🚧 | Rubric-based, step-by-step grading with repeated sampling and a confidence signal |
 | 🚧 | Evaluation harness and a public reliability report on human-graded answers |
 | 🚧 | Mistake taxonomy, weakness view, spaced-repetition review |
-| 🚧 | Next.js frontend, English UI, deployment |
+| 🚧 | Next.js frontend, English UI |
 
 ## Repository layout
 

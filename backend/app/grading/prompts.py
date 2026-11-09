@@ -49,3 +49,11 @@ Before judging the steps, transcribe the student's answer completely and faithfu
 the `transcription` field, using LaTeX for mathematics. Copy mistakes as written; do not
 correct them. Then grade the steps based on what you transcribed.
 """
+
+# Appended for English-language visitors. Only the language of the written fields changes;
+# the Japanese setting, which the evaluation measured, does not get this text.
+ENGLISH_FEEDBACK = (
+    "\n\n【出力言語】ai_feedback と explanation は英語で書いてください（数式は LaTeX のまま）。"
+    "採点基準と点数の付け方は上記のとおりで、変えないでください。\n"
+    "Write ai_feedback and explanation in English, keeping LaTeX for math. Grade exactly as instructed above."
+)

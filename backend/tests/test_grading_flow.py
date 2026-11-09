@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import select
 
 from app import clock, config
-from app.models import GradingJob, JobStatus, StudyPlan, Submission
+from app.models import GradingJob, JobStatus, StudyPlan, Submission, User
 from app.services import grading_jobs
 from tests.conftest import login_as
 from tests.factories import ANSWER_FILE, make_job, make_problem, make_submission
@@ -217,6 +217,71 @@ def test_global_daily_limit_applies_across_users(client, db, users, monkeypatch)
     )
 
     assert response.headers["location"] == "/?error=limit_reached"
+
+
+def _guest_with_jobs(db, name: str, ages: list[timedelta], status=JobStatus.QUEUED) -> User:
+    """A guest who queued one job per entry in `ages`, that long ago."""
+    guest = User(id=f"{name}-uid", is_guest=True)
+    db.add(guest)
+    db.commit()
+    problem = make_problem(db, guest.id)
+    for age in ages:
+        job = make_job(db, problem, status=status)
+        job.created_at = job.created_at - age
+    db.commit()
+    return guest
+
+
+def _submit_as(client, db, name: str):
+    login_as(client, name)
+    problem = make_problem(db, f"{name}-uid")
+    return client.post(f"/submit-answer/{problem.id}", files=ANSWER_FILE, follow_redirects=False)
+
+
+def test_guest_minute_limit_is_shared_by_all_guests(client, db):
+    _guest_with_jobs(db, "guest-a", [timedelta(0)] * 5)
+    db.add(User(id="guest-b-uid", is_guest=True))
+    db.commit()
+
+    response = _submit_as(client, db, "guest-b")
+
+    assert response.headers["location"] == "/?error=guest_limit"
+    assert "アカウント登録" in client.get("/?error=guest_limit").text
+    problem = make_problem(db, "guest-b-uid")
+    assert client.post(f"/api/problems/{problem.id}/grading-jobs", files=ANSWER_FILE).status_code == 429
+
+
+def test_guest_limits_do_not_apply_to_accounts(client, db, users):
+    _guest_with_jobs(db, "guest-a", [timedelta(0)] * 5)
+
+    assert _submit_as(client, db, "alice").headers["location"].startswith("/grading/")
+
+
+def test_guest_hour_and_day_limits(client, db, monkeypatch):
+    monkeypatch.setattr(config, "GUEST_GRADING_LIMITS", ((timedelta(minutes=1), 2), (timedelta(hours=1), 3)))
+    monkeypatch.setattr(config, "GUEST_DAILY_GRADING_LIMIT", 4)
+    _guest_with_jobs(db, "guest-a", [timedelta(seconds=61)] * 2)
+    db.add(User(id="guest-b-uid", is_guest=True))
+    db.commit()
+
+    # 2 jobs this hour, none this minute: allowed, making 3 this hour.
+    assert _submit_as(client, db, "guest-b").headers["location"].startswith("/grading/")
+    # Now the hourly cap (3) is reached even though the minute cap (2) is not.
+    assert _submit_as(client, db, "guest-b").headers["location"] == "/?error=guest_limit"
+
+    # Jobs from earlier today still count toward the daily cap once the hour has passed.
+    monkeypatch.setattr(config, "GUEST_GRADING_LIMITS", ())
+    assert _submit_as(client, db, "guest-b").headers["location"].startswith("/grading/")  # 4th today
+    assert _submit_as(client, db, "guest-b").headers["location"] == "/?error=guest_limit"
+
+
+def test_failed_guest_jobs_count_toward_guest_limits(client, db):
+    # A failed job still made model calls, so it counts against the shared guest budget.
+    _guest_with_jobs(db, "guest-a", [timedelta(0)] * 5, status=JobStatus.FAILED)
+    db.add(User(id="guest-b-uid", is_guest=True))
+    db.commit()
+
+    assert _submit_as(client, db, "guest-b").headers["location"] == "/?error=guest_limit"
 
 
 def test_cannot_submit_to_another_users_problem(client, db, users):

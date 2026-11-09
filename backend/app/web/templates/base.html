@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="{{ lang }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Next Learn {% block title %}{% endblock %}</title>
-    
+
     <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
@@ -25,31 +25,41 @@
     <nav>
         <div class="nav-left">
             <a href="/">
-                <img src="/static/NextLearn_applogo_80px.png" alt="NextLearn ロゴ" class="nav-logo">
+                <img src="/static/NextLearn_applogo_80px.png" alt="{{ _('NextLearn ロゴ') }}" class="nav-logo">
             </a>
         </div>
-        
+
         <div class="nav-center">
             <h2>
                 <a href="/" style="color: inherit; text-decoration: none;">Next Learn</a>
             </h2>
         </div>
-        
+
         <div class="nav-right">
             {% if request.state.user %}
             {% if request.state.user.is_guest %}
-            <span class="user-email">👤 ゲスト</span>
+            <span class="user-email">👤 {{ _("ゲスト") }}</span>
             <br>
-            <a href="/login?mode=signup" class="logout-link" style="color: inherit; text-decoration: none;">アカウント登録</a>
+            <a href="/login?mode=signup" class="logout-link" style="color: inherit; text-decoration: none;">{{ _("アカウント登録") }}</a>
             {% else %}
             <span class="user-email">👤 {{ request.state.user.email }}</span>
             <br>
-            <a href="/logout" class="logout-link" style="color: inherit; text-decoration: none;">ログアウト</a>
+            <a href="/logout" class="logout-link" style="color: inherit; text-decoration: none;">{{ _("ログアウト") }}</a>
             {% endif %}
+            <br>
             {% endif %}
+            {% if lang == 'en' %}<a href="/lang/ja" lang="ja" class="logout-link" style="color: inherit;">日本語</a>{% else %}<a href="/lang/en" lang="en" class="logout-link" style="color: inherit;">English</a>{% endif %}
         </div>
     </nav>
-    
+    {% if model_unavailable() %}
+    <div class="service-notice" role="status" style="background: #fff8e1; border-bottom: 1px solid #ffe082; color: #5d4037; padding: 12px 16px; text-align: center; line-height: 1.6;">
+        <strong>{{ _("AI採点は現在停止中です。") }}</strong>
+        {{ _("採点に使っているAIモデル（{model}）の提供がGoogleによって終了したため、新しい答案を受け付けていません。", model=grading_model) }}
+        {{ _("新しいモデルへの移行と、採点精度の再検証が済みしだい再開します。") }}
+        {% if sample_available() %}<a href="/sample{% if lang == 'en' %}#english{% endif %}">{{ _("実際の採点結果の見本を見る") }}</a>{% endif %}
+    </div>
+    {% endif %}
+
 
     <div class="container">
         {% block content %}

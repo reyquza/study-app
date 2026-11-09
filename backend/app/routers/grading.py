@@ -1,15 +1,23 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app import worker
+from app import config, worker
 from app.database import get_db
 from app.dependencies import get_current_user
+from app.grading import availability
 from app.models import GradingJob, User
 from app.schemas import GradingJobResponse
 from app.services import grading_jobs
 from app.services import problems as problem_service
 from app.services import storage
+from app.web import i18n
 
+
+LIMIT_MESSAGES = {
+    "user": "Daily grading limit reached",
+    "guest": "Guest grading is busy. Try again later, or sign up to keep grading",
+    "global": "Grading is at capacity for today",
+}
 
 router = APIRouter(
     prefix="/api",
@@ -23,6 +31,7 @@ router = APIRouter(
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def submit_answer(
+    request: Request,
     problem_id: int,
     answer_image: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -34,14 +43,19 @@ async def submit_answer(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Problem not found")
     if not problem.problem_image_path and not problem.problem_text:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Problem has no statement to grade against")
+    if availability.is_unavailable():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"The grading model {config.GEMINI_MODEL} is no longer available",
+        )
 
     try:
         upload = await storage.read_validated_upload(answer_image)
-        job = await grading_jobs.enqueue_grading(db, user.id, problem, upload)
+        job = await grading_jobs.enqueue_grading(db, user, problem, upload, language=i18n.pick_language(request))
     except storage.UploadRejected as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.message)
-    except grading_jobs.DailyLimitReached:
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Daily grading limit reached")
+    except grading_jobs.GradingLimitReached as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=LIMIT_MESSAGES[exc.scope])
 
     worker.notify_new_job()
     return job
