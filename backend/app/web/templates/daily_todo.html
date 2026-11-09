@@ -5,16 +5,16 @@
 <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
     <h3>{{ _("{date} の予定", date=view.day.strftime("%Y年%m月%d日") if lang == "ja" else view.day.strftime("%B %d, %Y")) }}</h3>
     <div>
-        <a href="/schedule?year={{ view.day.year }}&month={{ view.day.month }}" style="color: #1976D2; text-decoration: none; font-size: 0.9em; margin-right: 15px;">
+        <a href="/schedule?year={{ view.day.year }}&month={{ view.day.month }}" style="color: #1f8a4c; text-decoration: none; font-size: 0.9em; margin-right: 15px;">
             {{ _("カレンダーに戻る") }}
         </a>
-        <a href="/" style="color: #1976D2; text-decoration: none; font-size: 0.9em;">{{ _("ホームに戻る") }}</a>
+        <a href="/" style="color: #1f8a4c; text-decoration: none; font-size: 0.9em;">{{ _("ホームに戻る") }}</a>
     </div>
 </header>
 
 <main>
-    <div class="day-block" style="background-color: #fff8e1; border-color: #ffe0b2; margin-bottom: 30px;">
-        <h4 style="margin-top: 0; color: #f57c00; border-bottom: 2px solid #ffe0b2; padding-bottom: 5px;">{{ _("未完了のToDo") }}</h4>
+    <div class="day-block" style="margin-bottom: 16px;">
+        <h4>{{ _("未完了のToDo") }}</h4>
         
         {% if view.incomplete %}
             <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 15px;">
@@ -35,24 +35,19 @@
                                 
                                 <div style="font-size: 0.85em; color: #555;">
                                     {{ _("解いた回数:") }} <strong>{{ _("{n}回", n=view.solve_counts.get(plan.problem_id, 0)) }}</strong> | 
-                                    {{ _("前回の点数:") }} <strong style="color: #d32f2f;">{{ _("{score}点", score=view.latest_scores[plan.problem_id]) if view.latest_scores.get(plan.problem_id) is not none else "-" }}</strong>
+                                    {{ _("前回の点数:") }} <strong>{{ _("{score}点", score=view.latest_scores[plan.problem_id]) if view.latest_scores.get(plan.problem_id) is not none else "-" }}</strong>
                                 </div>
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 10px; max-width: 300px;">
-                                <a href="/solve/{{ plan.problem_id }}"
-                                style="display: block; width: 100%; text-align: center;
-                                        background-color: #f57c00; color: white; text-decoration: none;
-                                        padding: 10px; border-radius: 6px; font-weight: bold;">
+                                <a href="/solve/{{ plan.problem_id }}" class="btn" style="width: 100%;">
                                     {{ _("問題を解く") }}
                                 </a>
                                 <form action="/delete-task/{{ plan.id }}" method="post" onsubmit='return confirm({{ _("本当にこのタスクを削除しますか？") | tojson }});'>
-                                    <button type="submit" style="display: block; width: 100%; text-align: center;
-                                        background-color: #f1e60d; color: white; text-decoration: none;
-                                        padding: 10px; border-radius: 6px; font-weight: bold;">
+                                    <button type="submit" class="btn-danger" style="width: 100%;">
                                         {{ _("タスクを削除") }}
                                     </button>
                                 </form>
-                                <a href="/confirm-problem/{{ plan.problem_id }}" style="font-size: 0.8em; color: #1976D2; text-decoration: underline;">
+                                <a href="/confirm-problem/{{ plan.problem_id }}" style="font-size: 0.8em; color: #1f8a4c; text-decoration: underline;">
                                     {{ _("タスクの詳細") }}
                                 </a>
                             </div>
@@ -65,13 +60,13 @@
         {% endif %}
     </div>
 
-    <div class="day-block" style="background-color: #e8f5e9; border-color: #c8e6c9;">
-        <h4 style="margin-top: 0; color: #388e3c; border-bottom: 2px solid #c8e6c9; padding-bottom: 5px;">{{ _("完了したToDo") }}</h4>
+    <div class="day-block">
+        <h4>{{ _("完了したToDo") }}</h4>
         
         {% if view.completed %}
             <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 15px;">
                 {% for plan in view.completed %}
-                    <div style="background-color: white; border: 1px solid #c8e6c9; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <div style="background-color: white; border: 1px solid #cfe8d8; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 15px;">
                             <div style="flex: 1; min-width: 0;">
                                 <span style="font-size: 0.9em; color: #888; text-decoration: line-through;">{{ _("問題ID:") }} {{ plan.problem_id }}</span>
@@ -79,7 +74,7 @@
                                 
                                 <div style="margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 5px;">
                                     {% for tag in plan.problem.tags %}
-                                        <span style="background-color: #f1f8e9; color: #555; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; border: 1px solid #c8e6c9;">
+                                        <span style="background-color: #f1f8e9; color: #555; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; border: 1px solid #cfe8d8;">
                                             {{ tag.name }}
                                         </span>
                                     {% endfor %}
@@ -87,15 +82,15 @@
                                 
                                 <div style="font-size: 0.85em; color: #555;">
                                     {{ _("解いた回数:") }} <strong>{{ _("{n}回", n=view.solve_counts.get(plan.problem_id, 0)) }}</strong> | 
-                                    {{ _("今回の点数:") }} <strong style="color: #388e3c;">{{ _("{score}点", score=view.latest_scores[plan.problem_id]) if view.latest_scores.get(plan.problem_id) is not none else "-" }}</strong>
+                                    {{ _("今回の点数:") }} <strong style="color: #1f8a4c;">{{ _("{score}点", score=view.latest_scores[plan.problem_id]) if view.latest_scores.get(plan.problem_id) is not none else "-" }}</strong>
                                 </div>
                             </div>
                             <div style="text-align: right; flex-shrink: 0;">
-                                <a href="/solve/{{ plan.problem_id }}" style="display: inline-block; background-color: #4CAF50; color: white; text-decoration: none; padding: 8px 15px; border-radius: 4px; font-size: 0.9em; font-weight: bold; margin-bottom: 10px;">
+                                <a href="/solve/{{ plan.problem_id }}" style="display: inline-block; background-color: #1f8a4c; color: white; text-decoration: none; padding: 8px 15px; border-radius: 4px; font-size: 0.9em; font-weight: bold; margin-bottom: 10px;">
                                     {{ _("もう一度解く") }}
                                 </a>
                                 <br>
-                                <a href="/confirm-problem/{{ plan.problem_id }}" style="font-size: 0.8em; color: #1976D2; text-decoration: underline;">
+                                <a href="/confirm-problem/{{ plan.problem_id }}" style="font-size: 0.8em; color: #1f8a4c; text-decoration: underline;">
                                     {{ _("タスクの詳細") }}
                                 </a>
                             </div>
@@ -108,7 +103,7 @@
         {% endif %}
     </div>
     <div style="margin-top: 30px; text-align: center; padding-bottom: 20px;">
-        <a href="/add-task/{{ view.day.strftime('%Y-%m-%d') }}" style="display: inline-block; background-color: #4CAF50; color: white; text-decoration: none; padding: 15px 40px; border-radius: 30px; font-size: 1.1em; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.15); transition: background-color 0.3s;">
+        <a href="/add-task/{{ view.day.strftime('%Y-%m-%d') }}" class="rounded-btn" style="display: inline-flex; width: auto; padding: 13px 32px;">
             ＋ {{ _("新しいタスクを追加する") }}
         </a>
     </div>

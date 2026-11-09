@@ -23,36 +23,26 @@
 
 <body>
     <nav>
-        <div class="nav-left">
-            <a href="/">
-                <img src="/static/NextLearn_applogo_80px.png" alt="{{ _('NextLearn ロゴ') }}" class="nav-logo">
-            </a>
-        </div>
-
-        <div class="nav-center">
-            <h2>
-                <a href="/" style="color: inherit; text-decoration: none;">Next Learn</a>
-            </h2>
-        </div>
+        <a href="/" class="nav-brand">
+            <img src="/static/NextLearn_applogo_80px.png" alt="{{ _('NextLearn ロゴ') }}" class="nav-logo">
+            <span class="nav-title">NextLearn</span>
+        </a>
 
         <div class="nav-right">
             {% if request.state.user %}
             {% if request.state.user.is_guest %}
-            <span class="user-email">👤 {{ _("ゲスト") }}</span>
-            <br>
-            <a href="/login?mode=signup" class="logout-link" style="color: inherit; text-decoration: none;">{{ _("アカウント登録") }}</a>
+            <span class="user-chip">👤 {{ _("ゲスト") }}</span>
+            <a href="/login?mode=signup" class="nav-link is-cta">{{ _("アカウント登録") }}</a>
             {% else %}
-            <span class="user-email">👤 {{ request.state.user.email }}</span>
-            <br>
-            <a href="/logout" class="logout-link" style="color: inherit; text-decoration: none;">{{ _("ログアウト") }}</a>
+            <span class="user-chip" title="{{ request.state.user.email }}">👤 {{ request.state.user.email }}</span>
+            <a href="/logout" class="nav-link">{{ _("ログアウト") }}</a>
             {% endif %}
-            <br>
             {% endif %}
-            {% if lang == 'en' %}<a href="/lang/ja" lang="ja" class="logout-link" style="color: inherit;">日本語</a>{% else %}<a href="/lang/en" lang="en" class="logout-link" style="color: inherit;">English</a>{% endif %}
+            {% if lang == 'en' %}<a href="/lang/ja" lang="ja" class="nav-link">日本語</a>{% else %}<a href="/lang/en" lang="en" class="nav-link">English</a>{% endif %}
         </div>
     </nav>
     {% if model_unavailable() %}
-    <div class="service-notice" role="status" style="background: #fff8e1; border-bottom: 1px solid #ffe082; color: #5d4037; padding: 12px 16px; text-align: center; line-height: 1.6;">
+    <div class="service-notice" role="status">
         <strong>{{ _("AI採点は現在停止中です。") }}</strong>
         {{ _("採点に使っているAIモデル（{model}）の提供がGoogleによって終了したため、新しい答案を受け付けていません。", model=grading_model) }}
         {{ _("新しいモデルへの移行と、採点精度の再検証が済みしだい再開します。") }}
@@ -67,9 +57,7 @@
     </div>
 
     <footer>
-        &copy; 2026 Next Learn. All rights reserved.
-        <br>
-        Ray
+        &copy; 2026 NextLearn · Ray
     </footer>
 </body>
 </html>

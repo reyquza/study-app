@@ -12,20 +12,20 @@
     
     /* 曜日ごとの色 */
     .sun { color: #d32f2f; }
-    .sat { color: #1976D2; }
+    .sat { color: #1f8a4c; }
 
     /* 日付セルのリンク全体をクリック可能にする */
     .date-cell { text-decoration: none; color: inherit; display: block; height: 100%; box-sizing: border-box; }
     .date-cell:hover { background-color: #f0f8ff; }
     
     .date-num { text-align: right; margin-bottom: 5px; font-size: 0.9em; color: #333; }
-    .today-marker { background-color: #1976D2; color: white; padding: 2px 6px; border-radius: 50%; font-weight: bold; }
+    .today-marker { background-color: #1f8a4c; color: white; padding: 2px 6px; border-radius: 50%; font-weight: bold; }
 
     /* ToDoバーのデザイン */
     .todo-bar {
         font-size: 10px;
-        background-color: #e3f2fd;
-        border-left: 3px solid #1976D2;
+        background-color: #e9f6ee;
+        border-left: 3px solid #1f8a4c;
         margin-bottom: 2px;
         padding: 2px 4px;
         white-space: nowrap;
@@ -36,11 +36,11 @@
     }
     .todo-bar.completed {
         background-color: #f5f5f5;
-        border-left-color: #4CAF50;
-        color: #388e3c;
+        border-left-color: #1f8a4c;
+        color: #1f8a4c;
         text-decoration: line-through;
     }
-    .more-todos { font-size: 10px; color: #388e3c; text-align: right; padding-right: 2px; }
+    .more-todos { font-size: 10px; color: #1f8a4c; text-align: right; padding-right: 2px; }
     
     /* 下部のナビゲーションボタン */
     .month-nav {
@@ -62,11 +62,11 @@
 <div class="calendar-container">
     <div class="calendar-header">
         <h3 style="margin: 0;"><strong>{{ _("{year}年 {month}月の予定", year=view.year, month=view.month) }}</strong></h3>
-        <a href="/schedule" style="font-size: 0.9em; color: #1976D2; text-decoration: none;">{{ _("今月へ戻る") }}</a>
-        <a href="/" style="font-size: 0.9em; color: #1976D2; text-decoration: none;">{{ _("ホームへ戻る") }}</a>
+        <a href="/schedule" style="font-size: 0.9em; color: #1f8a4c; text-decoration: none;">{{ _("今月へ戻る") }}</a>
+        <a href="/" style="font-size: 0.9em; color: #1f8a4c; text-decoration: none;">{{ _("ホームへ戻る") }}</a>
     </div>
 
-    <table class="calendar-table">
+    <div class="table-scroll"><table class="calendar-table">
         <tr>
             <th class="sun">{{ _("日") }}</th><th>{{ _("月") }}</th><th>{{ _("火") }}</th><th>{{ _("水") }}</th><th>{{ _("木") }}</th><th>{{ _("金") }}</th><th class="sat">{{ _("土") }}</th>
         </tr>
@@ -99,7 +99,7 @@
             {% endfor %}
         </tr>
         {% endfor %}
-    </table>
+    </table></div>
 
     <div class="month-nav">
         <a href="/schedule?year={{ view.previous[0] }}&month={{ view.previous[1] }}">← {{ _("前の月へ") }}</a>
