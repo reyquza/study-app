@@ -125,6 +125,8 @@ def answer_page(answer_id: str):
   <label><input type="checkbox" name="flag:blank" {checked('blank')}> blank / no attempt</label><br>
   <label><input type="checkbox" name="flag:illegible" {checked('illegible')}> hard to read</label><br>
   <textarea name="note" rows="2" style="width:100%" placeholder="note">{html.escape(previous.get('note', ''))}</textarea>
+  <label for="ai_caution"><b>AIの採点で注意すべき点</b>（任意。例：(3)で根拠のない公式利用に点を与えそう／薄い字を読み違えそう）</label>
+  <textarea id="ai_caution" name="ai_caution" rows="3" style="width:100%">{html.escape(previous.get('ai_caution', ''))}</textarea>
   <button>Save and next</button>
  </form>
 </div></body></html>""")
@@ -142,6 +144,9 @@ async def save_label(answer_id: str, request: Request):
         "total": sum(awarded.values()),
         "flags": [key.removeprefix("flag:") for key in form if key.startswith("flag:")],
         "note": form.get("note", ""),
+        # What the human grader expects an AI grader to get wrong on this answer; compared
+        # with the AI's actual mistakes after the AI results are opened.
+        "ai_caution": form.get("ai_caution", ""),
         "at": datetime.now(timezone.utc).isoformat(),
     })
     return RedirectResponse("/", status_code=303)
