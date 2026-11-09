@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app import clock, config, samples, worker
 from app.grading import availability
 from app.web import i18n
+from app.web.formatting import render_ai_text
 from app.database import get_db
 from app.dependencies import get_current_user, get_optional_user
 from app.models import JobStatus, User
@@ -31,6 +32,8 @@ from app.services import submissions as submission_service
 WEB_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=WEB_DIR / "templates", context_processors=[i18n.template_context])
 # Read by base.html, the grading page and the login page on every render.
+# The model's feedback: escaped, with its Markdown and part labels laid out.
+templates.env.filters["ai_text"] = render_ai_text
 templates.env.globals.update(
     grading_model=config.GEMINI_MODEL,
     model_unavailable=availability.is_unavailable,

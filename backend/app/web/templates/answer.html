@@ -30,16 +30,12 @@
 
         <div class="ai-feedback-box">
             <strong style="color: #3f51b5; display: block; margin-bottom: 10px;">{{ _("AI講師からのアドバイス") }}</strong>
-            <div style="white-space: pre-wrap;">
-                {{ submission.ai_feedback }}
-            </div>
+            <div class="ai-text">{{ submission.ai_feedback | ai_text }}</div>
         </div>
 
         <div class="explanation-box">
             <strong style="color: #555; display: block; margin-bottom: 10px;">{{ _("模範解答・解説") }}</strong>
-            <div style="white-space: pre-wrap;">
-                {{ submission.explanation }}
-            </div>
+            <div class="ai-text">{{ submission.explanation | ai_text }}</div>
         </div>
 
         <div class="memo-form">

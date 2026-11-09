@@ -34,12 +34,12 @@
 
         <div class="ai-feedback-box">
             <strong style="color: #3f51b5; display: block; margin-bottom: 10px;">{{ _("AI講師からのアドバイス") }}{% if en %} (translated){% endif %}</strong>
-            <div style="white-space: pre-wrap;">{{ en.ai_feedback if en else sample.ai_feedback }}</div>
+            <div class="ai-text">{{ (en.ai_feedback if en else sample.ai_feedback) | ai_text }}</div>
         </div>
 
         <div class="explanation-box">
             <strong style="color: #555; display: block; margin-bottom: 10px;">{{ _("模範解答・解説") }}{% if en %} (translated){% endif %}</strong>
-            <div style="white-space: pre-wrap;">{{ en.explanation if en else sample.explanation }}</div>
+            <div class="ai-text">{{ (en.explanation if en else sample.explanation) | ai_text }}</div>
         </div>
 
         {% if en %}
@@ -48,9 +48,9 @@
             <p><strong>問題</strong></p>
             <div style="white-space: pre-wrap;">{{ sample.problem_text }}</div>
             <p><strong>AI講師からのアドバイス</strong></p>
-            <div style="white-space: pre-wrap;">{{ sample.ai_feedback }}</div>
+            <div class="ai-text">{{ sample.ai_feedback | ai_text }}</div>
             <p><strong>模範解答・解説</strong></p>
-            <div style="white-space: pre-wrap;">{{ sample.explanation }}</div>
+            <div class="ai-text">{{ sample.explanation | ai_text }}</div>
         </details>
         {% elif sample.english %}
         <section id="english" lang="en" class="day-block" style="margin-top: 24px; line-height: 1.6;">
@@ -60,9 +60,9 @@
             <div style="white-space: pre-wrap;">{{ sample.english.problem_text }}</div>
             <p><strong>AI score:</strong> {{ sample.score }} / 100</p>
             <p><strong>AI tutor's advice</strong> (translated):</p>
-            <div style="white-space: pre-wrap;">{{ sample.english.ai_feedback }}</div>
+            <div class="ai-text">{{ sample.english.ai_feedback | ai_text }}</div>
             <p><strong>Model answer and strategy</strong> (translated):</p>
-            <div style="white-space: pre-wrap;">{{ sample.english.explanation }}</div>
+            <div class="ai-text">{{ sample.english.explanation | ai_text }}</div>
         </section>
         {% endif %}
 
